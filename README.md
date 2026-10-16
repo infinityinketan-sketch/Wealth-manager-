@@ -13,7 +13,13 @@ Android expense and income tracker. Everything stays on the phone: no internet p
 
 Not in this stage: SMS capture, purpose tagging, statement upload, CSV export and backup, assets. See the build plan in the planning doc.
 
-## Open and run
+## Get the app without Android Studio
+1. On GitHub, open the **Actions** tab, choose **build-apk**, click **Run workflow** (a build also starts on every push).
+2. When the run finishes (about 5 to 10 minutes), open it and download **wealth-manager-debug-apk** under Artifacts.
+3. Unzip it, send `app-debug.apk` to your phone and tap it to install.
+If the run shows a red cross, the error lines are listed on the run page; copy them to Claude.
+
+## Open and run in Android Studio (optional)
 1. Install Android Studio (a recent release) and open this folder.
 2. Let Gradle sync (needs internet the first time).
 3. Run on a phone or emulator (Android 8.0 / API 26 or newer).
