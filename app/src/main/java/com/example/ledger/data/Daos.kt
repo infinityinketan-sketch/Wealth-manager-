@@ -17,6 +17,39 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIgnore(transaction: LedgerTransaction): Long
 
+    @Query("SELECT COUNT(*) FROM transactions WHERE smsKey IS NOT NULL")
+    suspend fun countSms(): Int
+
+    @Query("DELETE FROM transactions WHERE smsKey IS NOT NULL")
+    suspend fun deleteSms()
+
+    /** Same account, amount and direction within a few minutes: the bank sent the same alert twice. */
+    @Query(
+        "SELECT COUNT(*) FROM transactions WHERE accountId = :accountId AND amountPaise = :amount AND kind = :kind " +
+            "AND smsKey IS NOT NULL AND smsKey != :smsKey AND epochMillis BETWEEN :fromMillis AND :toMillis"
+    )
+    suspend fun countNear(accountId: Long, amount: Long, kind: EntryKind, smsKey: String, fromMillis: Long, toMillis: Long): Int
+
+    /** A bank or card debit of the same amount near this date (the EMI already counted from the bank side). */
+    @Query(
+        "SELECT COUNT(*) FROM transactions t JOIN accounts a ON a.id = t.accountId WHERE t.kind = 'EXPENSE' " +
+            "AND t.amountPaise = :amount AND t.epochMillis BETWEEN :fromMillis AND :toMillis AND a.type != 'LOAN'"
+    )
+    suspend fun countNonLoanExpense(amount: Long, fromMillis: Long, toMillis: Long): Int
+
+    /** Removes a lender's "EMI received" entry once the matching bank debit is known. */
+    @Query(
+        "DELETE FROM transactions WHERE kind = 'EXPENSE' AND amountPaise = :amount " +
+            "AND epochMillis BETWEEN :fromMillis AND :toMillis AND accountId IN (SELECT id FROM accounts WHERE type = 'LOAN')"
+    )
+    suspend fun deleteLoanExpense(amount: Long, fromMillis: Long, toMillis: Long)
+
+    @Query("UPDATE transactions SET accountId = :toId WHERE accountId = :fromId")
+    suspend fun moveAccount(fromId: Long, toId: Long)
+
+    @Query("UPDATE transactions SET accountId = :cashId WHERE accountId IN (SELECT id FROM accounts WHERE smsKey IS NOT NULL)")
+    suspend fun moveSmsAccountsTo(cashId: Long)
+
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE merchantKey = :merchantKey AND kind = :kind")
     suspend fun setCategoryForMerchant(merchantKey: String, kind: EntryKind, categoryId: Long)
 
@@ -47,6 +80,21 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE smsKey = :smsKey LIMIT 1")
     suspend fun findBySmsKey(smsKey: String): Account?
 
+    @Query("SELECT * FROM accounts WHERE smsKey LIKE :prefix || '%'")
+    suspend fun findBySmsKeyPrefix(prefix: String): List<Account>
+
+    @Query("SELECT * FROM accounts WHERE smsKey IS NOT NULL")
+    suspend fun smsAccounts(): List<Account>
+
+    @Query("SELECT id FROM accounts WHERE type = 'CASH' ORDER BY id LIMIT 1")
+    suspend fun cashAccountId(): Long?
+
+    @Query("DELETE FROM accounts WHERE smsKey IS NOT NULL")
+    suspend fun deleteSmsAccounts()
+
+    @Query("DELETE FROM accounts WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("UPDATE accounts SET latestBalancePaise = :balance, latestBalanceMillis = :millis WHERE id = :id AND latestBalanceMillis <= :millis")
     suspend fun updateBalanceIfNewer(id: Long, balance: Long, millis: Long)
 
@@ -54,7 +102,8 @@ interface AccountDao {
         "SELECT a.id AS accountId, a.name AS name, a.type AS type, " +
             "CASE WHEN a.latestBalancePaise IS NOT NULL THEN a.latestBalancePaise ELSE " +
             "a.openingBalancePaise + COALESCE(SUM(CASE WHEN t.kind = 'INCOME' THEN t.amountPaise " +
-            "WHEN t.kind = 'EXPENSE' THEN -t.amountPaise ELSE 0 END), 0) END AS balancePaise " +
+            "WHEN t.kind = 'EXPENSE' THEN -t.amountPaise ELSE 0 END), 0) END AS balancePaise, " +
+            "a.smsKey AS smsKey, a.latestBalancePaise AS latestBalancePaise, a.latestBalanceMillis AS latestBalanceMillis " +
             "FROM accounts a LEFT JOIN transactions t ON t.accountId = a.id " +
             "WHERE a.archived = 0 GROUP BY a.id ORDER BY a.id"
     )

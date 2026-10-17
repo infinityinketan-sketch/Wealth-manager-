@@ -113,6 +113,12 @@ fun TransactionEditor(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                Text(
+                    "Moving money to an FD, your own account or a card bill? Pick Investments & FD, Self transfer " +
+                        "or Credit card bill and it will not count as spending.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 PickerField(
                     label = "Category",
                     options = listOf("Uncategorised") + kindCategories.map { it.name },

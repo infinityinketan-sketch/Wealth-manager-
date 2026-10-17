@@ -44,3 +44,16 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - `sms/CategoryGuesser.kt` guesses the category from the merchant (Swiggy -> Food & dining, etc.).
 - Re-categorising a merchant's entry asks "every time or just this one?" and remembers the choice.
 - The database was reset by this version (stage 1 test data is not carried over).
+
+## v0.3.0: better SMS reading
+
+- Only real bank, card and lender messages are used; merchant receipts (MSEDCL, MakeMyTrip, Juspay ...) are ignored,
+  so the same payment is not counted twice.
+- Accounts are matched on the last 3 digits (ICICI shows 3, HDFC shows 4), so each account keeps its own balance.
+  Balances come only from the bank's SMS; accounts whose SMS never shows a balance are not added to the total.
+- FD / RD / investments, credit-card bill payments, own-account transfers, FD maturity and loan disbursals are
+  kept out of "spent" and "income".
+- A lender's "EMI received" message (credit to a loan account) is an EMI expense, and is dropped when the bank
+  debit for the same EMI is also there.
+- When the reading rules change (`SmsParser.VERSION`), SMS transactions are rebuilt from the inbox automatically;
+  manual entries and learned "every time" merchant choices are kept.

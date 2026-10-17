@@ -16,6 +16,7 @@ import com.example.ledger.data.EntryKind
 import com.example.ledger.data.LedgerTransaction
 import com.example.ledger.data.RecurringRule
 import com.example.ledger.sms.SmsImporter
+import com.example.ledger.sms.SmsParser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -77,7 +78,15 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
         if (scanState.value == ScanState.Running) return
         scanState.value = ScanState.Running
         viewModelScope.launch {
-            val result = SmsImporter.importInbox(app, repo, settings.lastSmsScanMillis)
+            repo.ensureStarterCategories()
+            // New reading rules: forget old SMS results and read the whole inbox again.
+            // Learned "every time" merchant choices and manual entries are kept.
+            val rulesChanged = settings.smsParserVersion != SmsParser.VERSION
+            if (rulesChanged) repo.clearSmsData()
+            val full = rulesChanged || repo.countSmsTransactions() == 0
+            val result = SmsImporter.importInbox(app, repo, if (full) 0L else settings.lastSmsScanMillis)
+            repo.finishImport()
+            settings.smsParserVersion = SmsParser.VERSION
             settings.lastSmsScanMillis = System.currentTimeMillis()
             scanState.value = ScanState.Done(result.scanned, result.imported)
         }
@@ -89,6 +98,7 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     init {
+        viewModelScope.launch { repo.ensureStarterCategories() }
         // Entries that came due while the app was closed show up immediately.
         viewModelScope.launch { repo.generateDueRecurring(LocalDate.now()) }
     }

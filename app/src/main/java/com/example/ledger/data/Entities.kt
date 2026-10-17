@@ -9,7 +9,8 @@ enum class AccountType(val label: String) {
     CASH("Cash"),
     BANK("Bank account"),
     UPI("UPI"),
-    CARD("Card")
+    CARD("Credit card"),
+    LOAN("Loan")
 }
 
 enum class EntryKind(val label: String) {
@@ -99,5 +100,10 @@ data class AccountBalance(
     val accountId: Long,
     val name: String,
     val type: AccountType,
-    val balancePaise: Long
+    val balancePaise: Long,
+    /** Non-null for accounts the app found in SMS. */
+    val smsKey: String?,
+    /** The balance a bank SMS reported, if any (null = the bank never said). */
+    val latestBalancePaise: Long?,
+    val latestBalanceMillis: Long
 )
