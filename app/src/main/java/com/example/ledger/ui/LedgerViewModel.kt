@@ -4,7 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ledger.LedgerApp
-import com.example.ledger.core.BudgetPeriod
+import com.example.ledger.core.PeriodPreset
+import com.example.ledger.core.Periods
 import com.example.ledger.core.DateRange
 import com.example.ledger.core.Frequency
 import com.example.ledger.data.Account
@@ -36,16 +37,18 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     private val startDayState = MutableStateFlow(settings.budgetStartDay)
     val startDay: StateFlow<Int> = startDayState
 
-    private val anchor = MutableStateFlow(LocalDate.now())
+    /** What the person picked at the top: a preset, how many steps back/forward, and custom dates. */
+    data class PeriodChoice(val preset: PeriodPreset, val offset: Int, val custom: DateRange?)
 
-    /** The budget month being viewed (it follows the user's chosen start day). */
-    val period: StateFlow<DateRange> = combine(anchor, startDayState) { date, day ->
-        BudgetPeriod.containing(date, day)
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.Eagerly,
-        BudgetPeriod.containing(LocalDate.now(), settings.budgetStartDay)
-    )
+    private val choiceState = MutableStateFlow(PeriodChoice(PeriodPreset.THIS_MONTH, 0, null))
+    val periodChoice: StateFlow<PeriodChoice> = choiceState
+
+    private fun resolve(choice: PeriodChoice, day: Int): DateRange =
+        Periods.shift(Periods.range(choice.preset, LocalDate.now(), day, choice.custom), choice.preset, choice.offset)
+
+    /** The date range being viewed. */
+    val period: StateFlow<DateRange> = combine(choiceState, startDayState) { choice, day -> resolve(choice, day) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, resolve(choiceState.value, settings.budgetStartDay))
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val transactions: StateFlow<List<LedgerTransaction>> = period
@@ -104,11 +107,20 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun previousPeriod() {
-        anchor.value = BudgetPeriod.previous(period.value).start
+        choiceState.value = choiceState.value.let { it.copy(offset = it.offset - 1) }
     }
 
     fun nextPeriod() {
-        anchor.value = BudgetPeriod.next(period.value).start
+        choiceState.value = choiceState.value.let { it.copy(offset = it.offset + 1) }
+    }
+
+    fun choosePreset(preset: PeriodPreset) {
+        choiceState.value = choiceState.value.copy(preset = preset, offset = 0)
+    }
+
+    fun chooseCustom(start: LocalDate, endInclusive: LocalDate) {
+        val (a, b) = if (endInclusive.isBefore(start)) endInclusive to start else start to endInclusive
+        choiceState.value = PeriodChoice(PeriodPreset.CUSTOM, 0, DateRange(a, b))
     }
 
     fun setStartDay(day: Int) {

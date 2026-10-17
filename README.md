@@ -67,3 +67,11 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - Learns words from the person's own "every time" choices (e.g. "AGRO" -> Groceries) and re-tags uncertain entries.
 - The edit screen shows the original bank message.
 - Fixed: a credit whose footer advertised a loan was treated as an EMI payment (income showed ₹0).
+
+## v0.5.0: periods, charts and a new look
+
+- Period picker: This month, Last month, 3 / 6 / 12 months, This year, This FY (Apr–Mar) or custom dates;
+  arrows step the chosen period back and forward (`core/Periods.kt`).
+- Charts for the chosen period (`ui/Charts.kt`, drawn on Canvas): category donut, spent vs income over time
+  (days / weeks / months picked automatically), running-total trend, top merchants.
+- Colourful theme, gradient summary and account cards, an icon and colour per category.

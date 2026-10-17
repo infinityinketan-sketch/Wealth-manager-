@@ -228,6 +228,7 @@ private fun LedgerRoot(
     val scan by viewModel.scan.collectAsStateWithLifecycle()
     var pendingLearn by remember { mutableStateOf<LedgerTransaction?>(null) }
     val period by viewModel.period.collectAsStateWithLifecycle()
+    val periodChoice by viewModel.periodChoice.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val balances by viewModel.balances.collectAsStateWithLifecycle()
@@ -279,6 +280,9 @@ private fun LedgerRoot(
                 lastImported = (scan as? LedgerViewModel.ScanState.Done)?.imported,
                 onEnableSms = onEnableSms,
                 onScanAgain = viewModel::scanSms,
+                preset = periodChoice.preset,
+                onPreset = viewModel::choosePreset,
+                onCustom = viewModel::chooseCustom,
                 onPrevious = viewModel::previousPeriod,
                 onNext = viewModel::nextPeriod,
                 onEdit = {

@@ -62,4 +62,21 @@ object Money {
         val fraction = (paise % 100).toInt()
         return if (fraction == 0) rupees.toString() else rupees.toString() + "." + fraction.toString().padStart(2, '0')
     }
+
+    /** Short amounts for chart axes and labels: ₹950, ₹12.5k, ₹1.2L, ₹3.4Cr. */
+    fun formatCompact(paise: Long): String {
+        val sign = if (paise < 0) "-" else ""
+        val rupees = Math.abs(paise) / 100.0
+        fun trim(v: Double): String {
+            val s = if (v >= 100) Math.round(v).toString() else String.format(java.util.Locale.ENGLISH, "%.1f", v)
+            return s.removeSuffix(".0")
+        }
+        val text = when {
+            rupees >= 1_00_00_000 -> trim(rupees / 1_00_00_000) + "Cr"
+            rupees >= 1_00_000 -> trim(rupees / 1_00_000) + "L"
+            rupees >= 1_000 -> trim(rupees / 1_000) + "k"
+            else -> Math.round(rupees).toString()
+        }
+        return sign + "₹" + text
+    }
 }
