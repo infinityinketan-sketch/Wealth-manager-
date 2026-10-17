@@ -29,7 +29,7 @@ data class ParsedSms(
 object SmsParser {
 
     /** Bump when the reading rules change: the app then re-reads old messages with the new rules. */
-    const val VERSION = 4
+    const val VERSION = 5
 
     private val amountRegex = Regex("""(?i)(?:rs\.?|inr|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""")
 
@@ -262,7 +262,7 @@ object SmsParser {
     private val upiSlashRegex = Regex("""(?i)upi/(?:dr/|cr/|p2a/|p2m/)?\d{6,}/([A-Za-z][A-Za-z0-9 &.\-]{1,30})""")
     private val infoRegex = Regex("""(?i)info[:\- ]+(?:upi[/\-]|nach[/\-]|imps[/\-]|neft[/\-]|pos[/\-])?\s*([A-Za-z][A-Za-z0-9 &.\-/]{2,34}?)$STOP""")
     // ICICI: "Acct XX123 debited for Rs 250.00 on 15-Oct-26; SWIGGY credited."
-    private val semicolonCreditedRegex = Regex("""(?i);\s*([A-Za-z][A-Za-z0-9 &.\-']{1,38}?)\s+credited""")
+    private val semicolonCreditedRegex = Regex("""(?i);\s*([A-Za-z0-9][A-Za-z0-9 &.\-'@_]{1,48}?)\s+credited""")
     // ICICI card: "... on 15-Oct-26 on AMAZON. Avl Limit"
     private val onDateOnRegex = Regex("""(?i)\bon\s+\d{1,2}[-/ ][A-Za-z0-9]{2,3}[-/ ]\d{2,4}\s+(?:on|at)\s+($NAME)$STOP""")
     private val atRegex = Regex("""(?i)\b(?:at|@)\s+($NAME)$STOP""")
@@ -275,12 +275,17 @@ object SmsParser {
         "customer", "user", "beneficiary", "debit", "credit", "amount", "dear", "info"
     )
 
+    private val qrPrefixes = listOf("paytmqr", "paytm.s", "bharatpe", "q0", "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "gpay-", "upiqr", "mab.")
+
     private fun clean(raw: String?): String? {
         val s = raw?.substringBefore("@")?.trim()?.trim('.', '-', '/', ' ', '*') ?: return null
         if (s.length < 2) return null
         val l = s.lowercase()
         if (notMerchant.any { l == it.trim() || l.startsWith(it) }) return null
         if (s.all { it.isDigit() || it == 'x' || it == 'X' || it == '*' || it == ' ' }) return null
+        // Shop QR codes ("paytmqr2810050501", "Q123456789", "bharatpe.9000012345") are codes, not names.
+        if (s.count { it.isDigit() } >= 5 && !s.contains(' ')) return null
+        if (qrPrefixes.any { l.startsWith(it) }) return null
         return s.uppercase().take(32)
     }
 
@@ -291,7 +296,7 @@ object SmsParser {
         vpaRegex.find(text)?.let { m ->
             clean(m.groupValues[2])?.let { return it }
             val handle = m.groupValues[1].substringBefore("@")
-            if (handle.count { it.isLetter() } >= 3) return handle.uppercase()
+            if (handle.count { it.isLetter() } >= 3) clean(handle)?.let { return it }
         }
         firstClean(upiSlashRegex, text)?.let { return it }
         if (!isIncome) firstClean(semicolonCreditedRegex, text)?.let { return it }

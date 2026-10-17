@@ -46,6 +46,8 @@ import com.example.ledger.ui.HomeScreen
 import com.example.ledger.ui.LedgerTheme
 import com.example.ledger.ui.LedgerViewModel
 import com.example.ledger.ui.MoreScreen
+import com.example.ledger.ui.SortScreen
+import com.example.ledger.ui.sortGroups
 import com.example.ledger.ui.TransactionEditor
 
 /**
@@ -227,6 +229,8 @@ private fun LedgerRoot(
 ) {
     val scan by viewModel.scan.collectAsStateWithLifecycle()
     var pendingLearn by remember { mutableStateOf<LedgerTransaction?>(null) }
+    var showSort by remember { mutableStateOf(false) }
+    val ruleKeys by viewModel.ruleKeys.collectAsStateWithLifecycle()
     val period by viewModel.period.collectAsStateWithLifecycle()
     val periodChoice by viewModel.periodChoice.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
@@ -240,6 +244,8 @@ private fun LedgerRoot(
     var tab by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<LedgerTransaction?>(null) }
+
+    val toSort = remember(transactions, categories, ruleKeys) { sortGroups(transactions, categories, ruleKeys) }
 
     Scaffold(
         bottomBar = {
@@ -281,6 +287,9 @@ private fun LedgerRoot(
                 onEnableSms = onEnableSms,
                 onScanAgain = viewModel::scanSms,
                 preset = periodChoice.preset,
+                toSortCount = toSort.sumOf { it.items.size },
+                toSortTotal = toSort.sumOf { it.total },
+                onSort = { showSort = true },
                 onPreset = viewModel::choosePreset,
                 onCustom = viewModel::chooseCustom,
                 onPrevious = viewModel::previousPeriod,
@@ -330,6 +339,21 @@ private fun LedgerRoot(
             },
             onDelete = viewModel::deleteTransaction,
             onDismiss = { showEditor = false }
+        )
+    }
+
+    if (showSort) {
+        SortScreen(
+            groups = toSort,
+            categories = categories,
+            accountNames = accounts.associate { it.id to it.name },
+            onLearn = viewModel::learnMerchant,
+            onSetOne = viewModel::setCategory,
+            onOpen = {
+                editing = it
+                showEditor = true
+            },
+            onDismiss = { showSort = false }
         )
     }
 

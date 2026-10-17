@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -63,6 +64,15 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
         repo.observeCategories().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val budgets: StateFlow<List<Budget>> =
         repo.observeBudgets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Merchants the person has already chosen a category for ("every time"). */
+    val ruleKeys: StateFlow<Set<String>> = repo.observeRuleKeys().map { it.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Sets the category of one entry only (for entries without a merchant name). */
+    fun setCategory(transaction: LedgerTransaction, categoryId: Long) {
+        viewModelScope.launch { repo.saveTransaction(transaction.copy(categoryId = categoryId)) }
+    }
+
     val recurring: StateFlow<List<RecurringRule>> =
         repo.observeRecurring().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 

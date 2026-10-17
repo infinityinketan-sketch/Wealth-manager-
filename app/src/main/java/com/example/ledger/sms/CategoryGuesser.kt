@@ -301,6 +301,9 @@ object CategoryGuesser {
         val words = merchant.trim().split(" ").filter { it.isNotBlank() }
         if (words.isEmpty() || words.size > 4) return false
         if (merchant.any { it.isDigit() || it == '&' || it == '.' || it == '@' || it == '*' }) return false
+        // Indian shop names usually start like this: "SHREE VIGNESHWARA", "SAI KRUPA", "OM SAI".
+        val shopStarts = setOf("shree", "shri", "sri", "sree", "shiv", "sai", "om", "jai", "jay", "maa", "new", "hotel", "the", "royal", "krishna", "ganesh", "balaji", "laxmi", "lakshmi", "mahalaxmi", "ambika", "durga", "hari", "jagdamba", "gurukrupa", "swami", "siddhi", "vighnaharta", "vigneshwara", "mauli", "datta", "shubham", "mangal", "annapurna")
+        if (words.first().lowercase() in shopStarts) return false
         val business = listOf(
             "pvt", "ltd", "limited", "llp", "store", "stores", "mart", "shop", "enterprise", "enterprises", "traders",
             "services", "solutions", "technologies", "tech", "india", "company", "corp", "agency", "centre", "center",

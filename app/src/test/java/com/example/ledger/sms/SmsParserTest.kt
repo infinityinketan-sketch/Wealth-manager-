@@ -265,4 +265,19 @@ class SmsParserTest {
         val ambiguous = CategoryGuesser.learnWords(listOf("NEEL TOUCH" to "Health", "AURA TOUCH" to "Personal care"))
         assertNull(ambiguous["touch"])
     }
+
+    @Test fun shopNamesAreNotPeople() {
+        assertFalse(CategoryGuesser.looksLikePerson("SHREE VIGNESHWA"))
+        assertFalse(CategoryGuesser.looksLikePerson("SAI KRUPA"))
+        assertTrue(CategoryGuesser.looksLikePerson("SHREENATH PARKHI"))
+    }
+
+    @Test fun qrCodesAreNotMerchantNames() {
+        val p = parse("VM-ICICIB-S", "ICICI Bank Acct XX374 debited for Rs 80.01 on 15-Oct-26; paytmqr281005050101@paytm credited. UPI:628812345678.")
+        assertNull(p.merchant)
+        val q = parse("VM-ICICIB-S", "ICICI Bank Acct XX374 debited for Rs 290.00 on 15-Oct-26; Q123456789@ybl credited. UPI:628812345679.")
+        assertNull(q.merchant)
+        val r = parse("VM-ICICIB-S", "ICICI Bank Acct XX374 debited for Rs 55.00 on 16-Oct-26; zomato@icici credited. UPI:628812345670.")
+        assertEquals("ZOMATO", r.merchant)
+    }
 }

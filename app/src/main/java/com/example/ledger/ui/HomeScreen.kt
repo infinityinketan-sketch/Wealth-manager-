@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DateRange
@@ -80,6 +81,9 @@ private enum class ChartKind(val label: String) { CATEGORIES("Categories"), OVER
 fun HomeScreen(
     period: DateRange,
     preset: PeriodPreset,
+    toSortCount: Int,
+    toSortTotal: Long,
+    onSort: () -> Unit,
     transactions: List<LedgerTransaction>,
     accounts: List<Account>,
     balances: List<AccountBalance>,
@@ -227,8 +231,9 @@ fun HomeScreen(
                         color = Color.White.copy(alpha = 0.85f)
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        HeroTile(Icons.Filled.ArrowDownward, "Income", Money.formatInr(income), Modifier.weight(1f))
-                        HeroTile(Icons.Filled.Savings, "Saved", Money.formatInr(income - expense), Modifier.weight(1f))
+                        // Whole rupees here so the amounts fit the tiles.
+                        HeroTile(Icons.Filled.ArrowDownward, "Income", Money.formatInr(income / 100 * 100), Modifier.weight(1f))
+                        HeroTile(Icons.Filled.Savings, "Saved", Money.formatInr((income - expense) / 100 * 100), Modifier.weight(1f))
                     }
                     if (moved > 0) {
                         Text(
@@ -251,6 +256,38 @@ fun HomeScreen(
                             trackColor = Color.White.copy(alpha = 0.25f)
                         )
                     }
+                }
+            }
+        }
+
+        // ---- things to sort ----
+        if (toSortCount > 0) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.tertiaryContainer)
+                        .clickable(onClick = onSort)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.tertiary),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Filled.Category, contentDescription = null, tint = Color.White) }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "$toSortCount payments need a category",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            Money.formatInr(toSortTotal) + " in this period · takes a minute, the app remembers",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                    Button(onClick = onSort) { Text("Sort") }
                 }
             }
         }

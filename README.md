@@ -75,3 +75,10 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - Charts for the chosen period (`ui/Charts.kt`, drawn on Canvas): category donut, spent vs income over time
   (days / weeks / months picked automatically), running-total trend, top merchants.
 - Colourful theme, gradient summary and account cards, an icon and colour per category.
+
+## v0.6.0: sort what the app could not place
+
+- Home shows "N payments need a category"; the Sort screen lists each unknown merchant with one-tap
+  category chips (remembered for every payment there) and single entries for payments without a name.
+- Shop names starting with Shree / Sai / Om ... are no longer treated as people; shop QR codes
+  (paytmqr…, Q123…) are not shown as merchant names.

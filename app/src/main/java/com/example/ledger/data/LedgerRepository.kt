@@ -27,6 +27,7 @@ class LedgerRepository(private val db: LedgerDatabase) {
     fun observeCategories(): Flow<List<Category>> = categories.observeAll()
     fun observeBudgets(): Flow<List<Budget>> = budgets.observeAll()
     fun observeRecurring(): Flow<List<RecurringRule>> = recurring.observeAll()
+    fun observeRuleKeys(): Flow<List<String>> = merchantRules.observeKeys()
 
     // ---- transactions ----
     suspend fun saveTransaction(transaction: LedgerTransaction) {

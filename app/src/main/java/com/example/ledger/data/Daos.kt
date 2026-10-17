@@ -140,6 +140,9 @@ interface MerchantRuleDao {
     @Query("SELECT * FROM merchant_rules")
     suspend fun all(): List<MerchantRule>
 
+    @Query("SELECT merchantKey FROM merchant_rules")
+    fun observeKeys(): Flow<List<String>>
+
     @Query(
         "SELECT DISTINCT t.merchant AS merchant, r.categoryId AS categoryId, r.kind AS kind FROM merchant_rules r " +
             "JOIN transactions t ON t.merchantKey = r.merchantKey WHERE t.merchant IS NOT NULL"
