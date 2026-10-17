@@ -131,6 +131,16 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // ---- "some payments send no SMS" note ----
+
+    private val noteState = MutableStateFlow(settings.trackingNoteSeen)
+    val trackingNoteSeen: StateFlow<Boolean> = noteState
+
+    fun dismissTrackingNote() {
+        settings.trackingNoteSeen = true
+        noteState.value = true
+    }
+
     // ---- what counts in totals ----
 
     private val countState = MutableStateFlow(settings.countChoices)

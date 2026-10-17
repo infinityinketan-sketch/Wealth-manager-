@@ -49,7 +49,13 @@ class Settings(context: Context) {
             ?.takeIf { it.size == 3 }?.let { Triple(it[0], it[1], it[2]) }
         set(value) = prefs.edit().putString(KEY_FULL_SCAN, value?.let { "${it.first},${it.second},${it.third}" }).apply()
 
+    /** True once the person dismissed the "some payments send no SMS" card. */
+    var trackingNoteSeen: Boolean
+        get() = prefs.getBoolean(KEY_TRACKING_NOTE, false)
+        set(value) = prefs.edit().putBoolean(KEY_TRACKING_NOTE, value).apply()
+
     private companion object {
+        const val KEY_TRACKING_NOTE = "tracking_note_seen"
         const val KEY_FULL_SCAN = "last_full_scan"
         const val KEY_COUNT = "count_choices"
         const val KEY_DECLINED = "declined_reminders"

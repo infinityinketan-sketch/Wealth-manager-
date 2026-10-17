@@ -125,3 +125,8 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - The first read covers the whole inbox, not only the last 12 months.
 - Home shows "Read N messages · M bank transactions · K not understood"; the "not understood" screen lists
   those bank messages with the reason and can copy them with long numbers hidden.
+
+## v0.9.2: say up front what SMS cannot see
+
+- The first screen, a home card (until "Got it") and a "Why are some payments missing?" link explain that small UPI
+  payments (some banks send no SMS), UPI Lite, cash and wallets are not in bank SMS, and how to add them.

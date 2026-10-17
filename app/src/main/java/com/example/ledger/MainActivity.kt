@@ -205,8 +205,22 @@ private fun SmsIntroScreen(onAllow: () -> Unit, onSkip: () -> Unit) {
                     "Your messages are read on this phone only. This app has no internet access, so nothing is uploaded, ever. " +
                     "Only bank and payment messages are used; personal chats are ignored.",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 20.dp, bottom = 28.dp)
+                modifier = Modifier.padding(top = 20.dp, bottom = 16.dp)
             )
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(bottom = 24.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("Good to know", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    Text(
+                        com.example.ledger.ui.TrackingInfo.SHORT,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
             Button(onClick = onAllow) { Text("Allow and scan my messages") }
             TextButton(onClick = onSkip) { Text("Not now, I will add entries myself") }
         }
@@ -243,6 +257,7 @@ private fun LedgerRoot(
     val ruleKeys by viewModel.ruleKeys.collectAsStateWithLifecycle()
     val dues by viewModel.dues.collectAsStateWithLifecycle()
     val countChoices by viewModel.countChoices.collectAsStateWithLifecycle()
+    val trackingNoteSeen by viewModel.trackingNoteSeen.collectAsStateWithLifecycle()
     val unread by viewModel.unread.collectAsStateWithLifecycle()
     val scanStats by viewModel.scanStats.collectAsStateWithLifecycle()
     var showUnread by remember { mutableStateOf(false) }
@@ -313,6 +328,12 @@ private fun LedgerRoot(
                 lastImported = (scan as? LedgerViewModel.ScanState.Done)?.imported,
                 onEnableSms = onEnableSms,
                 onScanAgain = viewModel::scanSms,
+                trackingNoteSeen = trackingNoteSeen,
+                onDismissTrackingNote = viewModel::dismissTrackingNote,
+                onAddPayment = {
+                    editing = null
+                    showEditor = true
+                },
                 preset = periodChoice.preset,
                 countChoices = countChoices,
                 toSortCount = toSort.sumOf { it.items.size },

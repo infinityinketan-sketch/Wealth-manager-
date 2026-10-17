@@ -108,6 +108,9 @@ fun HomeScreen(
     lastImported: Int?,
     onEnableSms: () -> Unit,
     onScanAgain: () -> Unit,
+    trackingNoteSeen: Boolean,
+    onDismissTrackingNote: () -> Unit,
+    onAddPayment: () -> Unit,
     onPreset: (PeriodPreset) -> Unit,
     onCustom: (LocalDate, LocalDate) -> Unit,
     onPrevious: () -> Unit,
@@ -125,6 +128,7 @@ fun HomeScreen(
     val categoryById = remember(categories) { categories.associateBy { it.id } }
     val excludedIds = remember(categories, countChoices) { excludedCategoryIds(categories, countChoices) }
     var showTotalsInfo by remember { mutableStateOf(false) }
+    var showTrackingInfo by remember { mutableStateOf(false) }
     val shown = remember(transactions, selectedAccountId) {
         if (selectedAccountId == null) transactions else transactions.filter { it.accountId == selectedAccountId }
     }
@@ -301,6 +305,21 @@ fun HomeScreen(
             }
         }
 
+        // ---- told up front: what SMS cannot see ----
+        if (smsGranted && !trackingNoteSeen) {
+            item {
+                SoftCard {
+                    Text("Some payments send no SMS", fontWeight = FontWeight.SemiBold)
+                    Text(TrackingInfo.SHORT, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onAddPayment) { Text("Add a payment") }
+                        OutlinedButton(onClick = { showTrackingInfo = true }) { Text("More") }
+                        TextButton(onClick = onDismissTrackingNote) { Text("Got it") }
+                    }
+                }
+            }
+        }
+
         // ---- things to sort ----
         if (toSortCount > 0) {
             item {
@@ -383,6 +402,12 @@ fun HomeScreen(
                                 )
                             }
                         }
+                        Text(
+                            "Why are some payments missing? ⓘ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { showTrackingInfo = true }
+                        )
                         if (lastImported != null && lastImported > 0) {
                             Text(
                                 "$lastImported new just now",
@@ -598,6 +623,10 @@ fun HomeScreen(
                 )
             }
         }
+    }
+
+    if (showTrackingInfo) {
+        TrackingInfoDialog(onDismiss = { showTrackingInfo = false })
     }
 
     if (showTotalsInfo) {
