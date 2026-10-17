@@ -12,9 +12,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Category::class,
         LedgerTransaction::class,
         Budget::class,
-        RecurringRule::class
+        RecurringRule::class,
+        MerchantRule::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class LedgerDatabase : RoomDatabase() {
@@ -23,11 +24,14 @@ abstract class LedgerDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun budgetDao(): BudgetDao
     abstract fun recurringDao(): RecurringDao
+    abstract fun merchantRuleDao(): MerchantRuleDao
 
     companion object {
         fun build(context: Context): LedgerDatabase =
             Room.databaseBuilder(context.applicationContext, LedgerDatabase::class.java, "ledger.db")
                 .addCallback(SeedCallback)
+                // Test builds only: moving from the empty stage-1 database simply starts fresh.
+                .fallbackToDestructiveMigration()
                 .build()
     }
 
@@ -54,7 +58,7 @@ abstract class LedgerDatabase : RoomDatabase() {
         )
 
         override fun onCreate(db: SupportSQLiteDatabase) {
-            db.execSQL("INSERT INTO accounts (name, type, openingBalancePaise, archived) VALUES ('Cash', 'CASH', 0, 0)")
+            db.execSQL("INSERT INTO accounts (name, type, openingBalancePaise, archived, latestBalanceMillis) VALUES ('Cash', 'CASH', 0, 0, 0)")
             expense.forEach { (name, color) ->
                 db.execSQL("INSERT INTO categories (name, kind, colorArgb) VALUES ('${name.replace("'", "''")}', 'EXPENSE', $color)")
             }

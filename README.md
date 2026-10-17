@@ -32,3 +32,15 @@ Command line: `./gradlew assembleDebug` and `./gradlew test`.
 
 ## Status of this code
 The plain-Kotlin logic in `core/` (money formatting and parsing, budget months, recurrence dates) was compiled and its 23 unit tests were run. The Android parts (database, screens, lock) were written without being compiled, because the build environment could not reach Google's Maven repository. Expect a few compile errors or warnings on the first build; they should be small and quick to fix.
+
+
+## Stage 2: automatic SMS capture (v0.2.0)
+
+On first open the app asks for SMS permission, then reads the last 12 months of bank / UPI / card
+messages **on the phone** and builds accounts, balances, transactions and category totals from them.
+New messages are picked up as they arrive. The app has no INTERNET permission.
+
+- `sms/SmsParser.kt` reads amount, debit/credit, account last 4 digits, merchant and available balance.
+- `sms/CategoryGuesser.kt` guesses the category from the merchant (Swiggy -> Food & dining, etc.).
+- Re-categorising a merchant's entry asks "every time or just this one?" and remembers the choice.
+- The database was reset by this version (stage 1 test data is not carried over).

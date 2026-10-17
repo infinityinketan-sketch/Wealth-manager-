@@ -16,7 +16,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -32,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ledger.core.DateRange
 import com.example.ledger.core.Money
+import com.example.ledger.data.Account
 import com.example.ledger.data.AccountBalance
 import com.example.ledger.data.Budget
 import com.example.ledger.data.Category
@@ -43,14 +48,23 @@ import java.time.LocalDate
 fun HomeScreen(
     period: DateRange,
     transactions: List<LedgerTransaction>,
+    accounts: List<Account>,
     balances: List<AccountBalance>,
     categories: List<Category>,
     budgets: List<Budget>,
+    smsGranted: Boolean,
+    scanning: Boolean,
+    lastImported: Int?,
+    onEnableSms: () -> Unit,
+    onScanAgain: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onEdit: (LedgerTransaction) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val accountById = remember(accounts) { accounts.associateBy { it.id } }
+    val totalBalance = remember(balances) { balances.sumOf { it.balancePaise } }
+    val byDay = remember(transactions) { transactions.groupBy { it.epochDay }.toList() }
     val income = remember(transactions) { transactions.filter { it.kind == EntryKind.INCOME }.sumOf { it.amountPaise } }
     val expense = remember(transactions) { transactions.filter { it.kind == EntryKind.EXPENSE }.sumOf { it.amountPaise } }
     val spentByCategory = remember(transactions) {
@@ -83,11 +97,27 @@ fun HomeScreen(
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SummaryRow("Income", Money.formatInr(income), amountColor(EntryKind.INCOME))
-                    SummaryRow("Expenses", Money.formatInr(expense), MaterialTheme.colorScheme.onSurface)
-                    SummaryRow("Saved", Money.formatInr(income - expense), MaterialTheme.colorScheme.primary, bold = true)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("You spent", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        Money.formatInr(expense),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Income", style = MaterialTheme.typography.labelMedium)
+                            Text(Money.formatInr(income), fontWeight = FontWeight.SemiBold, color = Color(0xFF2E7D32))
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Saved", style = MaterialTheme.typography.labelMedium)
+                            Text(Money.formatInr(income - expense), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                     if (overallBudget != null) {
                         BudgetBar(
                             label = "Monthly budget",
@@ -99,11 +129,48 @@ fun HomeScreen(
             }
         }
 
+        item {
+            when {
+                scanning -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Text("Reading your bank messages…", style = MaterialTheme.typography.bodyMedium)
+                }
+                !smsGranted -> Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Track spending automatically", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Allow SMS access and Wealth Manager finds your bank and UPI transactions by itself. " +
+                                "Messages are read on this phone only; nothing is uploaded.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Button(onClick = onEnableSms) { Text("Allow and scan messages") }
+                    }
+                }
+                lastImported != null -> Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        if (lastImported > 0) "Found $lastImported new transactions in your messages" else "Messages are up to date",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(onClick = onScanAgain) { Text("Rescan") }
+                }
+                else -> {}
+            }
+        }
+
         if (balances.isNotEmpty()) {
             item { SectionTitle("Accounts") }
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SummaryRow("Total balance", Money.formatInr(totalBalance), MaterialTheme.colorScheme.primary, bold = true)
                         balances.forEach { balance ->
                             SummaryRow(
                                 label = balance.name + " · " + balance.type.label,
@@ -144,37 +211,71 @@ fun HomeScreen(
         if (transactions.isEmpty()) {
             item {
                 Text(
-                    "Nothing in this month yet. Tap + to add your first entry.",
+                    if (smsGranted) "No transactions found for this month yet. Tap + to add one, or Rescan to read messages again."
+                    else "Nothing in this month yet. Allow SMS access above, or tap + to add your first entry.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        items(transactions, key = { it.id }) { transaction ->
-            val category = transaction.categoryId?.let { categoryById[it] }
-            ListItem(
-                headlineContent = { Text(category?.name ?: "Uncategorised") },
-                supportingContent = {
-                    val date = formatShortDate(LocalDate.ofEpochDay(transaction.epochDay))
-                    Text(if (transaction.note.isBlank()) date else date + " · " + transaction.note)
-                },
-                leadingContent = {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .background(category?.let { Color(it.colorArgb) } ?: Color.Gray, CircleShape)
-                    )
-                },
-                trailingContent = {
-                    val sign = if (transaction.kind == EntryKind.INCOME) "+" else "-"
+        byDay.forEach { (day, list) ->
+            item(key = "day$day") {
+                val total = list.filter { it.kind == EntryKind.EXPENSE }.sumOf { it.amountPaise }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(
-                        text = sign + Money.formatInr(transaction.amountPaise),
-                        color = amountColor(transaction.kind),
-                        fontWeight = FontWeight.Medium
+                        formatDate(LocalDate.ofEpochDay(day)),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                },
-                modifier = Modifier.clickable { onEdit(transaction) }
-            )
+                    if (total > 0) {
+                        Text(
+                            Money.formatInr(total),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            items(list, key = { it.id }) { transaction ->
+                val category = transaction.categoryId?.let { categoryById[it] }
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            transaction.merchant?.lowercase()?.split(" ")
+                                ?.joinToString(" ") { w -> w.replaceFirstChar { c -> c.uppercase() } }
+                                ?: category?.name ?: "Uncategorised"
+                        )
+                    },
+                    supportingContent = {
+                        val account = accountById[transaction.accountId]?.name
+                        val parts = listOfNotNull(
+                            category?.name ?: "Uncategorised",
+                            account,
+                            transaction.note.takeIf { it.isNotBlank() }
+                        )
+                        Text(parts.joinToString(" · "))
+                    },
+                    leadingContent = {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .background(category?.let { Color(it.colorArgb) } ?: Color.Gray, CircleShape)
+                        )
+                    },
+                    trailingContent = {
+                        val sign = if (transaction.kind == EntryKind.INCOME) "+" else "-"
+                        Text(
+                            text = sign + Money.formatInr(transaction.amountPaise),
+                            color = amountColor(transaction.kind),
+                            fontWeight = FontWeight.Medium
+                        )
+                    },
+                    modifier = Modifier.clickable { onEdit(transaction) }
+                )
+            }
         }
     }
 }

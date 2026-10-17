@@ -13,6 +13,13 @@ interface TransactionDao {
     @Insert
     suspend fun insert(transaction: LedgerTransaction): Long
 
+    /** Returns -1 when a transaction with the same smsKey already exists. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIgnore(transaction: LedgerTransaction): Long
+
+    @Query("UPDATE transactions SET categoryId = :categoryId WHERE merchantKey = :merchantKey AND kind = :kind")
+    suspend fun setCategoryForMerchant(merchantKey: String, kind: EntryKind, categoryId: Long)
+
     @Update
     suspend fun update(transaction: LedgerTransaction)
 
@@ -37,10 +44,17 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE archived = 0 ORDER BY id")
     fun observeActive(): Flow<List<Account>>
 
+    @Query("SELECT * FROM accounts WHERE smsKey = :smsKey LIMIT 1")
+    suspend fun findBySmsKey(smsKey: String): Account?
+
+    @Query("UPDATE accounts SET latestBalancePaise = :balance, latestBalanceMillis = :millis WHERE id = :id AND latestBalanceMillis <= :millis")
+    suspend fun updateBalanceIfNewer(id: Long, balance: Long, millis: Long)
+
     @Query(
         "SELECT a.id AS accountId, a.name AS name, a.type AS type, " +
+            "CASE WHEN a.latestBalancePaise IS NOT NULL THEN a.latestBalancePaise ELSE " +
             "a.openingBalancePaise + COALESCE(SUM(CASE WHEN t.kind = 'INCOME' THEN t.amountPaise " +
-            "WHEN t.kind = 'EXPENSE' THEN -t.amountPaise ELSE 0 END), 0) AS balancePaise " +
+            "WHEN t.kind = 'EXPENSE' THEN -t.amountPaise ELSE 0 END), 0) END AS balancePaise " +
             "FROM accounts a LEFT JOIN transactions t ON t.accountId = a.id " +
             "WHERE a.archived = 0 GROUP BY a.id ORDER BY a.id"
     )
@@ -58,8 +72,20 @@ interface CategoryDao {
     @Delete
     suspend fun delete(category: Category)
 
+    @Query("SELECT * FROM categories")
+    suspend fun all(): List<Category>
+
     @Query("SELECT * FROM categories ORDER BY kind, name")
     fun observeAll(): Flow<List<Category>>
+}
+
+@Dao
+interface MerchantRuleDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(rule: MerchantRule)
+
+    @Query("SELECT * FROM merchant_rules")
+    suspend fun all(): List<MerchantRule>
 }
 
 @Dao

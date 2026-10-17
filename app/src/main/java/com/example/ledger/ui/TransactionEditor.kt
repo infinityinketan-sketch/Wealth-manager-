@@ -79,6 +79,13 @@ fun TransactionEditor(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (existing?.merchant != null) {
+                    Text(
+                        (if (existing.kind == EntryKind.INCOME) "From " else "Paid to ") + existing.merchant +
+                            (if (existing.smsKey != null) "  ·  read from SMS" else ""),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     EntryKind.values().forEach { option ->
                         FilterChip(
@@ -155,15 +162,21 @@ fun TransactionEditor(
                 } else if (accounts.isEmpty()) {
                     error = "Add an account first"
                 } else {
-                    val transaction = LedgerTransaction(
-                        id = existing?.id ?: 0L,
-                        accountId = accounts[accountIndex.coerceIn(0, accounts.size - 1)].id,
+                    val accountId = accounts[accountIndex.coerceIn(0, accounts.size - 1)].id
+                    val transaction = existing?.copy(
+                        accountId = accountId,
                         categoryId = categoryId,
                         kind = kind,
                         amountPaise = paise,
                         note = note.trim(),
-                        epochDay = date.toEpochDay(),
-                        recurringRuleId = existing?.recurringRuleId
+                        epochDay = date.toEpochDay()
+                    ) ?: LedgerTransaction(
+                        accountId = accountId,
+                        categoryId = categoryId,
+                        kind = kind,
+                        amountPaise = paise,
+                        note = note.trim(),
+                        epochDay = date.toEpochDay()
                     )
                     onSave(transaction, if (existing == null) repeatValues[repeatIndex] else null)
                     onDismiss()

@@ -1,6 +1,9 @@
 package com.example.ledger
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -14,7 +17,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ledger.data.EntryKind
 import com.example.ledger.data.LedgerTransaction
 import com.example.ledger.ui.HomeScreen
 import com.example.ledger.ui.LedgerTheme
@@ -60,20 +66,51 @@ class MainActivity : FragmentActivity() {
 
     private val settings get() = (application as LedgerApp).settings
 
+    private var smsGranted by mutableStateOf(false)
+    private var smsPromptDone by mutableStateOf(false)
+
+    private fun hasSmsPermission() =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+
+    private val smsPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            settings.smsPromptDone = true
+            smsPromptDone = true
+            smsGranted = hasSmsPermission()
+            if (smsGranted) viewModel.scanSms()
+        }
+
+    private fun requestSms() {
+        smsPermissionLauncher.launch(arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         appLockEnabled = settings.appLockEnabled
         locked = appLockEnabled
+        smsGranted = hasSmsPermission()
+        smsPromptDone = settings.smsPromptDone
 
         setContent {
             LedgerTheme {
                 if (locked) {
                     LockedScreen(onUnlock = { authenticate() })
+                } else if (!smsGranted && !smsPromptDone) {
+                    SmsIntroScreen(
+                        onAllow = { requestSms() },
+                        onSkip = {
+                            settings.smsPromptDone = true
+                            smsPromptDone = true
+                        }
+                    )
                 } else {
                     LedgerRoot(
                         viewModel = viewModel,
                         appLockEnabled = appLockEnabled,
-                        onAppLockChange = { setAppLock(it) }
+                        onAppLockChange = { setAppLock(it) },
+                        smsGranted = smsGranted,
+                        onEnableSms = { requestSms() }
                     )
                 }
             }
@@ -82,6 +119,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        smsGranted = hasSmsPermission()
+        // Pick up anything that arrived while the app was closed.
+        if (smsGranted && !locked) viewModel.scanSms()
         if (locked) authenticate()
     }
 
@@ -136,6 +176,34 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
+private fun SmsIntroScreen(onAllow: () -> Unit, onSkip: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(28.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Wealth Manager", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                "Your spending, tracked automatically",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                "Allow access to your messages and the app finds your bank, UPI and card transactions " +
+                    "on its own: what you spent, where, your income and your balances.\n\n" +
+                    "Your messages are read on this phone only. This app has no internet access, so nothing is uploaded, ever. " +
+                    "Only bank and payment messages are used; personal chats are ignored.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 20.dp, bottom = 28.dp)
+            )
+            Button(onClick = onAllow) { Text("Allow and scan my messages") }
+            TextButton(onClick = onSkip) { Text("Not now, I will add entries myself") }
+        }
+    }
+}
+
+@Composable
 private fun LockedScreen(onUnlock: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -153,8 +221,12 @@ private fun LockedScreen(onUnlock: () -> Unit) {
 private fun LedgerRoot(
     viewModel: LedgerViewModel,
     appLockEnabled: Boolean,
-    onAppLockChange: (Boolean) -> Unit
+    onAppLockChange: (Boolean) -> Unit,
+    smsGranted: Boolean,
+    onEnableSms: () -> Unit
 ) {
+    val scan by viewModel.scan.collectAsStateWithLifecycle()
+    var pendingLearn by remember { mutableStateOf<LedgerTransaction?>(null) }
     val period by viewModel.period.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
@@ -198,9 +270,15 @@ private fun LedgerRoot(
             HomeScreen(
                 period = period,
                 transactions = transactions,
+                accounts = accounts,
                 balances = balances,
                 categories = categories,
                 budgets = budgets,
+                smsGranted = smsGranted,
+                scanning = scan is LedgerViewModel.ScanState.Running,
+                lastImported = (scan as? LedgerViewModel.ScanState.Done)?.imported,
+                onEnableSms = onEnableSms,
+                onScanAgain = viewModel::scanSms,
                 onPrevious = viewModel::previousPeriod,
                 onNext = viewModel::nextPeriod,
                 onEdit = {
@@ -238,9 +316,40 @@ private fun LedgerRoot(
             categories = categories,
             onSave = { transaction, repeat ->
                 if (repeat != null) viewModel.addRecurring(transaction, repeat) else viewModel.saveTransaction(transaction)
+                // The person re-categorised a merchant's entry: offer to remember it for every such entry.
+                val before = editing
+                if (before != null && repeat == null && transaction.merchantKey != null &&
+                    transaction.categoryId != null && transaction.categoryId != before.categoryId
+                ) {
+                    pendingLearn = transaction
+                }
             },
             onDelete = viewModel::deleteTransaction,
             onDismiss = { showEditor = false }
         )
     }
+
+    pendingLearn?.let { tx ->
+        val categoryName = categories.firstOrNull { it.id == tx.categoryId }?.name ?: "this category"
+        AlertDialog(
+            onDismissRequest = { pendingLearn = null },
+            title = { Text("Remember this?") },
+            text = {
+                Text(
+                    "Put every " + (if (tx.kind == EntryKind.INCOME) "entry from " else "payment to ") +
+                        (tx.merchant ?: "this merchant") + " under " + categoryName + ", now and in future?"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val key = tx.merchantKey
+                    val cat = tx.categoryId
+                    if (key != null && cat != null) viewModel.learnMerchant(key, tx.kind, cat)
+                    pendingLearn = null
+                }) { Text("Every time") }
+            },
+            dismissButton = { TextButton(onClick = { pendingLearn = null }) { Text("Just this one") } }
+        )
+    }
 }
+

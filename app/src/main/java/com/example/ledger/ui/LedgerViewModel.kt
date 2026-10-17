@@ -15,6 +15,7 @@ import com.example.ledger.data.Category
 import com.example.ledger.data.EntryKind
 import com.example.ledger.data.LedgerTransaction
 import com.example.ledger.data.RecurringRule
+import com.example.ledger.sms.SmsImporter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -60,6 +61,32 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
         repo.observeBudgets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val recurring: StateFlow<List<RecurringRule>> =
         repo.observeRecurring().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** null = never scanned this session; otherwise the progress of reading the SMS inbox. */
+    sealed interface ScanState {
+        data object Idle : ScanState
+        data object Running : ScanState
+        data class Done(val scanned: Int, val imported: Int) : ScanState
+    }
+
+    private val scanState = MutableStateFlow<ScanState>(ScanState.Idle)
+    val scan: StateFlow<ScanState> = scanState
+
+    /** Reads bank messages from the SMS inbox (needs the SMS permission). Safe to call repeatedly. */
+    fun scanSms() {
+        if (scanState.value == ScanState.Running) return
+        scanState.value = ScanState.Running
+        viewModelScope.launch {
+            val result = SmsImporter.importInbox(app, repo, settings.lastSmsScanMillis)
+            settings.lastSmsScanMillis = System.currentTimeMillis()
+            scanState.value = ScanState.Done(result.scanned, result.imported)
+        }
+    }
+
+    /** Saves the person's category choice for a merchant and applies it to all of that merchant's entries. */
+    fun learnMerchant(merchantKey: String, kind: EntryKind, categoryId: Long) {
+        viewModelScope.launch { repo.learnMerchant(merchantKey, kind, categoryId) }
+    }
 
     init {
         // Entries that came due while the app was closed show up immediately.
