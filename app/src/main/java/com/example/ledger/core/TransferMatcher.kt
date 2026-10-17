@@ -6,14 +6,14 @@ data class MoneyMove(val id: Long, val accountId: Long, val isIncome: Boolean, v
 /**
  * Pairs a debit from one of the person's accounts with a credit of the same amount into another of
  * their accounts, close in time. Such pairs are self-transfers: not spending and not income.
- * Quick pairs (within 30 minutes) count from ₹100; slower ones (bank transfers that land the next
+ * Quick pairs (within 30 minutes) count from ₹500; slower ones (bank transfers that land the next
  * day) only from ₹5,000, to avoid pairing two unrelated small payments.
  */
 object TransferMatcher {
     private const val MINUTE = 60_000L
     private const val QUICK_WINDOW = 30 * MINUTE
     private const val SLOW_WINDOW = 2 * 24 * 60 * MINUTE
-    private const val QUICK_MIN = 100_00L
+    private const val QUICK_MIN = 500_00L
     private const val SLOW_MIN = 5_000_00L
 
     /** Returns (debit id, credit id) pairs; each entry is used at most once. */

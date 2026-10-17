@@ -25,6 +25,7 @@ class LedgerRepository(private val db: LedgerDatabase) {
     private val recurring = db.recurringDao()
     private val merchantRules = db.merchantRuleDao()
     private val dues = db.dueDao()
+    private val overrides = db.overrideDao()
 
     // ---- reads ----
     fun observeTransactions(fromDay: Long, toDay: Long): Flow<List<LedgerTransaction>> =
@@ -42,6 +43,8 @@ class LedgerRepository(private val db: LedgerDatabase) {
     // ---- transactions ----
     suspend fun saveTransaction(transaction: LedgerTransaction) {
         if (transaction.id == 0L) transactions.insert(transaction) else transactions.update(transaction)
+        // A fix to an SMS entry is remembered, so reading the inbox again never undoes it.
+        transaction.smsKey?.let { overrides.upsert(EntryOverride(it, transaction.categoryId, transaction.note)) }
     }
 
     suspend fun deleteTransaction(transaction: LedgerTransaction) = transactions.delete(transaction)
@@ -101,7 +104,9 @@ class LedgerRepository(private val db: LedgerDatabase) {
         internal val categoryByName: Map<Pair<String, EntryKind>, Long>,
         internal val rules: Map<Pair<String, EntryKind>, Long>,
         /** Words learned from the person's own choices, e.g. "medical" -> "Health", per income / expense. */
-        internal val learned: Map<EntryKind, Map<String, String>>
+        internal val learned: Map<EntryKind, Map<String, String>>,
+        /** The person's own fixes to single entries, by SMS key. */
+        internal val overrides: Map<String, EntryOverride> = emptyMap()
     )
 
     suspend fun newImportContext(): ImportContext {
@@ -115,7 +120,7 @@ class LedgerRepository(private val db: LedgerDatabase) {
                 examples.filter { it.kind == kind }.mapNotNull { e -> nameById[e.categoryId]?.let { e.merchant to it } }
             )
         }
-        return ImportContext(mutableMapOf(), cats, rules, learned)
+        return ImportContext(mutableMapOf(), cats, rules, learned, overrides.all().associateBy { it.smsKey })
     }
 
     private val minute = 60_000L
@@ -208,10 +213,10 @@ class LedgerRepository(private val db: LedgerDatabase) {
             accounts.updateBalanceIfNewer(accountId, parsed.balancePaise, millis)
         }
 
-        // The same alert sent twice (some banks send from two sender ids).
-        if (transactions.countNear(accountId, parsed.amountPaise, kind, smsKey, millis - 3 * minute, millis + 3 * minute) > 0) {
-            return false
-        }
+        // The same alert twice: identical text, or the bank's second sender id. Two real payments of
+        // the same amount from the same sender (two ₹20 teas) are both kept.
+        val near = transactions.keysNear(accountId, parsed.amountPaise, kind, smsKey, millis - 3 * minute, millis + 3 * minute)
+        if (near.any { SmsDuplicates.isRepeat(it, smsKey) }) return false
         if (parsed.accountKind == SmsAccountKind.LOAN) {
             // The lender confirms an EMI that the bank debit already counted: keep only the bank side.
             if (transactions.countNonLoanExpense(parsed.amountPaise, millis - 4 * day, millis + 4 * day) > 0) return false
@@ -220,7 +225,8 @@ class LedgerRepository(private val db: LedgerDatabase) {
         }
 
         val merchantKey = CategoryGuesser.merchantKey(parsed.merchant)
-        val categoryId = merchantKey?.let { ctx.rules[it to kind] }
+        val fix = ctx.overrides[smsKey]
+        val categoryId = if (fix != null) fix.categoryId else merchantKey?.let { ctx.rules[it to kind] }
             ?: parsed.categoryHint?.let { ctx.categoryByName[it to kind] }
             ?: CategoryGuesser.guess(parsed.isIncome, parsed.merchant, bodyForGuess, ctx.learned[kind] ?: emptyMap())
                 ?.let { ctx.categoryByName[it to kind] }
@@ -233,7 +239,7 @@ class LedgerRepository(private val db: LedgerDatabase) {
                 categoryId = categoryId,
                 kind = kind,
                 amountPaise = parsed.amountPaise,
-                note = "",
+                note = fix?.note ?: "",
                 epochDay = epochDay,
                 merchant = parsed.merchant,
                 merchantKey = merchantKey,
@@ -282,10 +288,12 @@ class LedgerRepository(private val db: LedgerDatabase) {
         if (items.isEmpty()) return
         db.withTransaction {
             transactions.setCategory(items.map { it.id }, categoryId)
+            overrides.upsertAll(items.mapNotNull { t -> t.smsKey?.let { EntryOverride(it, categoryId, t.note) } })
             if (remember) {
                 items.filter { it.merchantKey != null }.map { it.merchantKey!! to it.kind }.distinct().forEach { (key, kind) ->
                     merchantRules.upsert(MerchantRule(key, categoryId, kind))
                     transactions.setCategoryForMerchant(key, kind, categoryId)
+                    overrides.clearForMerchant(key, kind)
                 }
             }
         }
@@ -296,6 +304,7 @@ class LedgerRepository(private val db: LedgerDatabase) {
         db.withTransaction {
             merchantRules.upsert(MerchantRule(merchantKey, categoryId, kind))
             transactions.setCategoryForMerchant(merchantKey, kind, categoryId)
+            overrides.clearForMerchant(merchantKey, kind)
         }
         reguessUncertain()
     }
@@ -308,6 +317,7 @@ class LedgerRepository(private val db: LedgerDatabase) {
         val ctx = newImportContext()
         val fallbackIds = ctx.categoryByName.filterKeys { it.first in StarterCategories.fallbackNames }.values.toList()
         for (t in transactions.uncertain(fallbackIds)) {
+            if (t.smsKey != null && t.smsKey in ctx.overrides) continue // the person chose this one themselves
             val merchant = t.merchant ?: continue
             val newId = t.merchantKey?.let { ctx.rules[it to t.kind] }
                 ?: CategoryGuesser.guess(t.kind == EntryKind.INCOME, merchant, "", ctx.learned[t.kind] ?: emptyMap())
@@ -332,10 +342,11 @@ class LedgerRepository(private val db: LedgerDatabase) {
         val cardBillId = idOf(CategoryGuesser.CARD_BILL, EntryKind.EXPENSE) ?: selfId
         val fallbackIds = cats.filter { it.name in StarterCategories.fallbackNames }.map { it.id }.toSet()
         val ruled = merchantRules.all().map { it.merchantKey }.toSet()
+        val fixed = overrides.all().map { it.smsKey }.toSet()
         val types = accounts.smsAccounts().associate { it.id to it.type }
 
         val candidates = transactions.ownAccountSmsSince(nowMillis - 400 * day)
-            .filter { (it.categoryId == null || it.categoryId in fallbackIds) && (it.merchantKey == null || it.merchantKey !in ruled) }
+            .filter { (it.categoryId == null || it.categoryId in fallbackIds) && (it.merchantKey == null || it.merchantKey !in ruled) && it.smsKey !in fixed }
         val byId = candidates.associateBy { it.id }
         val pairs = TransferMatcher.pairs(candidates.map { MoneyMove(it.id, it.accountId, it.kind == EntryKind.INCOME, it.amountPaise, it.epochMillis) })
         if (pairs.isEmpty()) return

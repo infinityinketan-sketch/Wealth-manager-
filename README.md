@@ -98,3 +98,11 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
   spending and income.
 - First scan shows "Reading your messages 13100/18870".
 - Database version 3 adds the `dues` table with a migration (nothing is lost).
+
+## v0.8.1: review fixes
+
+- One-off category / note fixes to SMS entries are stored (`overrides`, DB v4) and re-applied whenever the
+  inbox is read again; a later "every time" choice for that shop replaces them.
+- Bank balances: last SMS balance plus every entry after it ("Bank SMS 16 Sep + 12 later").
+- Duplicate alerts are only identical texts or a second sender id; two real same-amount payments are both kept.
+- Quick self-transfer pairs start at ₹500 (was ₹100).

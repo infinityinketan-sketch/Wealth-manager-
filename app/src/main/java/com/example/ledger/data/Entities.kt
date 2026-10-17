@@ -70,6 +70,17 @@ data class MerchantRule(
     val kind: EntryKind
 )
 
+/**
+ * A choice the person made for one SMS entry (category and note). It is re-applied when the inbox
+ * is read again with improved rules, so their fixes are never lost.
+ */
+@Entity(tableName = "overrides")
+data class EntryOverride(
+    @PrimaryKey val smsKey: String,
+    val categoryId: Long?,
+    val note: String
+)
+
 /** A merchant the person categorised themselves, used to learn words like "medical" -> Health. */
 data class MerchantExample(val merchant: String, val categoryId: Long, val kind: EntryKind)
 
@@ -108,7 +119,9 @@ data class AccountBalance(
     val smsKey: String?,
     /** The balance a bank SMS reported, if any (null = the bank never said). */
     val latestBalancePaise: Long?,
-    val latestBalanceMillis: Long
+    val latestBalanceMillis: Long,
+    /** Entries after the last balance SMS that were added to (or taken from) that balance. */
+    val laterCount: Int
 )
 
 enum class DueKind(val label: String) {

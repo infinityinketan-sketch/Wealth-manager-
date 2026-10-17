@@ -16,9 +16,10 @@ import com.example.ledger.sms.StarterCategories
         Budget::class,
         RecurringRule::class,
         MerchantRule::class,
-        Due::class
+        Due::class,
+        EntryOverride::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class LedgerDatabase : RoomDatabase() {
@@ -29,12 +30,13 @@ abstract class LedgerDatabase : RoomDatabase() {
     abstract fun recurringDao(): RecurringDao
     abstract fun merchantRuleDao(): MerchantRuleDao
     abstract fun dueDao(): DueDao
+    abstract fun overrideDao(): OverrideDao
 
     companion object {
         fun build(context: Context): LedgerDatabase =
             Room.databaseBuilder(context.applicationContext, LedgerDatabase::class.java, "ledger.db")
                 .addCallback(SeedCallback)
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 // Test builds only: moving from the empty stage-1 database simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()
@@ -50,6 +52,16 @@ abstract class LedgerDatabase : RoomDatabase() {
                     "`repeatMonths` INTEGER, `createdMillis` INTEGER NOT NULL)"
             )
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_dues_dueKey` ON `dues` (`dueKey`)")
+        }
+    }
+
+    /** Version 4 keeps the person's own fixes to single SMS entries. */
+    private object MIGRATION_3_4 : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `overrides` (`smsKey` TEXT NOT NULL, `categoryId` INTEGER, " +
+                    "`note` TEXT NOT NULL, PRIMARY KEY(`smsKey`))"
+            )
         }
     }
 

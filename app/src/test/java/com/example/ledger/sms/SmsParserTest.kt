@@ -280,4 +280,13 @@ class SmsParserTest {
         val r = parse("VM-ICICIB-S", "ICICI Bank Acct XX374 debited for Rs 55.00 on 16-Oct-26; zomato@icici credited. UPI:628812345670.")
         assertEquals("ZOMATO", r.merchant)
     }
+
+    @Test fun duplicateAlertsVersusRealRepeats() {
+        // Same text arriving twice is one payment.
+        assertTrue(SmsDuplicates.isRepeat("VM-HDFCBK-S|1000|555", "AD-HDFCBK-S|1060|555"))
+        // The bank's second sender id with different wording is one payment.
+        assertTrue(SmsDuplicates.isRepeat("VM-HDFCBK-S|1000|555", "VM-HDFCUP-S|1030|777"))
+        // Two real ₹20 teas from the same bank sender, different messages: two payments.
+        assertFalse(SmsDuplicates.isRepeat("VM-ICICIB-S|1000|555", "VM-ICICIB-S|1090|666"))
+    }
 }

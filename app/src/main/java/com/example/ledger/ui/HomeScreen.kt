@@ -551,12 +551,13 @@ private fun rangeLabel(r: DateRange): String =
     else formatDate(r.start) + " – " + formatDate(r.endInclusive)
 
 /** The balance to show: what the bank last reported, or for manual accounts the computed one. */
-private fun knownBalance(b: AccountBalance): Long? = if (b.smsKey == null) b.balancePaise else b.latestBalancePaise
+private fun knownBalance(b: AccountBalance): Long? = if (b.smsKey != null && b.latestBalancePaise == null) null else b.balancePaise
 
 private fun balanceDetail(b: AccountBalance): String = when {
     b.smsKey == null -> b.type.label
     b.latestBalancePaise != null && b.latestBalanceMillis > 0 ->
-        "As of " + formatDate(Instant.ofEpochMilli(b.latestBalanceMillis).atZone(ZoneId.systemDefault()).toLocalDate())
+        "Bank SMS " + formatShortDate(Instant.ofEpochMilli(b.latestBalanceMillis).atZone(ZoneId.systemDefault()).toLocalDate()) +
+            if (b.laterCount > 0) " + ${b.laterCount} later" else ""
     else -> "SMS shows no balance"
 }
 

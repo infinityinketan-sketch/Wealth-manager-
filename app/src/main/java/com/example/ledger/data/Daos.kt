@@ -45,10 +45,10 @@ interface TransactionDao {
 
     /** Same account, amount and direction within a few minutes: the bank sent the same alert twice. */
     @Query(
-        "SELECT COUNT(*) FROM transactions WHERE accountId = :accountId AND amountPaise = :amount AND kind = :kind " +
+        "SELECT smsKey FROM transactions WHERE accountId = :accountId AND amountPaise = :amount AND kind = :kind " +
             "AND smsKey IS NOT NULL AND smsKey != :smsKey AND epochMillis BETWEEN :fromMillis AND :toMillis"
     )
-    suspend fun countNear(accountId: Long, amount: Long, kind: EntryKind, smsKey: String, fromMillis: Long, toMillis: Long): Int
+    suspend fun keysNear(accountId: Long, amount: Long, kind: EntryKind, smsKey: String, fromMillis: Long, toMillis: Long): List<String>
 
     /** A bank or card debit of the same amount near this date (the EMI already counted from the bank side). */
     @Query(
@@ -120,10 +120,12 @@ interface AccountDao {
 
     @Query(
         "SELECT a.id AS accountId, a.name AS name, a.type AS type, " +
-            "CASE WHEN a.latestBalancePaise IS NOT NULL THEN a.latestBalancePaise ELSE " +
+            "CASE WHEN a.latestBalancePaise IS NOT NULL THEN a.latestBalancePaise + COALESCE(SUM(CASE WHEN t.epochMillis > a.latestBalanceMillis " +
+            "THEN (CASE WHEN t.kind = 'INCOME' THEN t.amountPaise ELSE -t.amountPaise END) ELSE 0 END), 0) ELSE " +
             "a.openingBalancePaise + COALESCE(SUM(CASE WHEN t.kind = 'INCOME' THEN t.amountPaise " +
             "WHEN t.kind = 'EXPENSE' THEN -t.amountPaise ELSE 0 END), 0) END AS balancePaise, " +
-            "a.smsKey AS smsKey, a.latestBalancePaise AS latestBalancePaise, a.latestBalanceMillis AS latestBalanceMillis " +
+            "a.smsKey AS smsKey, a.latestBalancePaise AS latestBalancePaise, a.latestBalanceMillis AS latestBalanceMillis, " +
+            "COALESCE(SUM(CASE WHEN a.latestBalancePaise IS NOT NULL AND t.epochMillis > a.latestBalanceMillis THEN 1 ELSE 0 END), 0) AS laterCount " +
             "FROM accounts a LEFT JOIN transactions t ON t.accountId = a.id " +
             "WHERE a.archived = 0 GROUP BY a.id ORDER BY a.id"
     )
@@ -212,4 +214,20 @@ interface DueDao {
 
     @Query("SELECT DISTINCT merchantKey FROM dues WHERE merchantKey IS NOT NULL")
     fun observeMerchantKeys(): Flow<List<String>>
+}
+
+@Dao
+interface OverrideDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(o: EntryOverride)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(list: List<EntryOverride>)
+
+    @Query("SELECT * FROM overrides")
+    suspend fun all(): List<EntryOverride>
+
+    /** A newer "every time" choice for a merchant replaces earlier one-off fixes for it. */
+    @Query("DELETE FROM overrides WHERE smsKey IN (SELECT smsKey FROM transactions WHERE merchantKey = :merchantKey AND kind = :kind)")
+    suspend fun clearForMerchant(merchantKey: String, kind: EntryKind)
 }
