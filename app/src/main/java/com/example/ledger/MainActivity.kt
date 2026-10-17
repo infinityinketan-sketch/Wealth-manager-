@@ -46,6 +46,9 @@ import com.example.ledger.ui.HomeScreen
 import com.example.ledger.ui.LedgerTheme
 import com.example.ledger.ui.LedgerViewModel
 import com.example.ledger.ui.MoreScreen
+import com.example.ledger.ui.CategoryScreen
+import com.example.ledger.ui.formatDate
+import com.example.ledger.ui.formatShortDate
 import com.example.ledger.ui.SortScreen
 import com.example.ledger.ui.sortGroups
 import com.example.ledger.ui.TransactionEditor
@@ -230,6 +233,8 @@ private fun LedgerRoot(
     val scan by viewModel.scan.collectAsStateWithLifecycle()
     var pendingLearn by remember { mutableStateOf<LedgerTransaction?>(null) }
     var showSort by remember { mutableStateOf(false) }
+    // The category opened from the home screen: (category id or null for uncategorised, kind, account filter).
+    var openCategory by remember { mutableStateOf<Triple<Long?, EntryKind, Long?>?>(null) }
     val ruleKeys by viewModel.ruleKeys.collectAsStateWithLifecycle()
     val period by viewModel.period.collectAsStateWithLifecycle()
     val periodChoice by viewModel.periodChoice.collectAsStateWithLifecycle()
@@ -294,6 +299,7 @@ private fun LedgerRoot(
                 onCustom = viewModel::chooseCustom,
                 onPrevious = viewModel::previousPeriod,
                 onNext = viewModel::nextPeriod,
+                onOpenCategory = { id, kind, accountId -> openCategory = Triple(id, kind, accountId) },
                 onEdit = {
                     editing = it
                     showEditor = true
@@ -339,6 +345,26 @@ private fun LedgerRoot(
             },
             onDelete = viewModel::deleteTransaction,
             onDismiss = { showEditor = false }
+        )
+    }
+
+    openCategory?.let { (catId, kind, accountId) ->
+        val items = transactions.filter {
+            it.categoryId == catId && it.kind == kind && (accountId == null || it.accountId == accountId)
+        }
+        CategoryScreen(
+            category = categories.firstOrNull { it.id == catId },
+            kind = kind,
+            periodLabel = formatShortDate(period.start) + " – " + formatDate(period.endInclusive),
+            items = items,
+            categories = categories,
+            accountNames = accounts.associate { it.id to it.name },
+            onMove = viewModel::recategorize,
+            onOpen = {
+                editing = it
+                showEditor = true
+            },
+            onDismiss = { openCategory = null }
         )
     }
 

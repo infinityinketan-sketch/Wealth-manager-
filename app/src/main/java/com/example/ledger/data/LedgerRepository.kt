@@ -257,6 +257,24 @@ class LedgerRepository(private val db: LedgerDatabase) {
      * The person fixed a category on a merchant's transaction. With [applyToAll] every transaction
      * from that merchant gets the category now, and future ones follow the same rule.
      */
+    /**
+     * Moves several entries to one category at once. With [remember], every shop among them is
+     * learned too, so its other and future payments follow.
+     */
+    suspend fun recategorize(items: List<LedgerTransaction>, categoryId: Long, remember: Boolean) {
+        if (items.isEmpty()) return
+        db.withTransaction {
+            transactions.setCategory(items.map { it.id }, categoryId)
+            if (remember) {
+                items.filter { it.merchantKey != null }.map { it.merchantKey!! to it.kind }.distinct().forEach { (key, kind) ->
+                    merchantRules.upsert(MerchantRule(key, categoryId, kind))
+                    transactions.setCategoryForMerchant(key, kind, categoryId)
+                }
+            }
+        }
+        if (remember) reguessUncertain()
+    }
+
     suspend fun learnMerchant(merchantKey: String, kind: EntryKind, categoryId: Long) {
         db.withTransaction {
             merchantRules.upsert(MerchantRule(merchantKey, categoryId, kind))

@@ -82,3 +82,8 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
   category chips (remembered for every payment there) and single entries for payments without a name.
 - Shop names starting with Shree / Sai / Om ... are no longer treated as people; shop QR codes
   (paytmqr…, Q123…) are not shown as merchant names.
+
+## v0.7.0: fix categories in bulk
+
+- Tap a category (Spending / Income by category, or the donut legend) to see its entries for the period,
+  search them, tick several (or Select all) and "Move to…" another category, optionally remembering the shops.

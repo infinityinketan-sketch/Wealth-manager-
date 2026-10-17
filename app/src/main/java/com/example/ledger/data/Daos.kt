@@ -21,6 +21,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE smsKey IS NOT NULL AND merchant IS NOT NULL AND (categoryId IS NULL OR categoryId IN (:ids))")
     suspend fun uncertain(ids: List<Long>): List<LedgerTransaction>
 
+    @Query("UPDATE transactions SET categoryId = :categoryId WHERE id IN (:ids)")
+    suspend fun setCategory(ids: List<Long>, categoryId: Long)
+
     @Query("SELECT COUNT(*) FROM transactions WHERE smsKey IS NOT NULL")
     suspend fun countSms(): Int
 

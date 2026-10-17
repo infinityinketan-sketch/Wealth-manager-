@@ -106,6 +106,10 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /** Saves the person's category choice for a merchant and applies it to all of that merchant's entries. */
+    fun recategorize(items: List<LedgerTransaction>, categoryId: Long, remember: Boolean) {
+        viewModelScope.launch { repo.recategorize(items, categoryId, remember) }
+    }
+
     fun learnMerchant(merchantKey: String, kind: EntryKind, categoryId: Long) {
         viewModelScope.launch { repo.learnMerchant(merchantKey, kind, categoryId) }
     }

@@ -2,6 +2,7 @@ package com.example.ledger.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,7 +43,7 @@ import kotlin.math.ceil
 import kotlin.math.max
 
 /** One piece of the category donut. [category] is null for the "everything else" slice. */
-data class ChartSlice(val label: String, val value: Long, val color: Color, val category: Category?)
+data class ChartSlice(val label: String, val value: Long, val color: Color, val category: Category?, val isRest: Boolean = false)
 
 /** A rounded-up axis maximum (1, 2, 2.5 or 5 x a power of ten) so grid labels are tidy. */
 private fun niceMax(v: Long): Long {
@@ -54,7 +55,7 @@ private fun niceMax(v: Long): Long {
 }
 
 @Composable
-fun DonutChart(slices: List<ChartSlice>, total: Long, modifier: Modifier = Modifier) {
+fun DonutChart(slices: List<ChartSlice>, total: Long, modifier: Modifier = Modifier, onSliceClick: ((ChartSlice) -> Unit)? = null) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.size(190.dp)) {
@@ -81,7 +82,8 @@ fun DonutChart(slices: List<ChartSlice>, total: Long, modifier: Modifier = Modif
             }
         }
         slices.forEach { s ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val click = if (onSliceClick != null && !s.isRest) Modifier.clickable { onSliceClick(s) } else Modifier
+            Row(modifier = click, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CategoryBadge(s.category, size = 30.dp)
                 Text(s.label, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val pct = if (total > 0) (s.value * 100.0 / total) else 0.0

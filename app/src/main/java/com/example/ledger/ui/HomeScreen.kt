@@ -99,6 +99,7 @@ fun HomeScreen(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onEdit: (LedgerTransaction) -> Unit,
+    onOpenCategory: (categoryId: Long?, kind: EntryKind, accountId: Long?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Tapping an account shows only that account's money; tapping it again shows everything.
@@ -124,6 +125,10 @@ fun HomeScreen(
         expenses.groupBy { it.categoryId }.mapValues { e -> e.value.sumOf { it.amountPaise } }
             .toList().sortedByDescending { it.second }
     }
+    val incomeByCategory = remember(incomes) {
+        incomes.groupBy { it.categoryId }.mapValues { e -> e.value.sumOf { it.amountPaise } }
+            .toList().sortedByDescending { it.second }
+    }
     val budgetByCategory = remember(budgets) { budgets.associateBy { it.categoryId } }
     val monthly = preset == PeriodPreset.THIS_MONTH || preset == PeriodPreset.LAST_MONTH
     val overallBudget = if (monthly) budgetByCategory[Budget.OVERALL_ID] else null
@@ -143,7 +148,7 @@ fun HomeScreen(
             ChartSlice(c?.name ?: "Uncategorised", v, categoryColor(c), c)
         }
         val rest = spentByCategory.drop(7).sumOf { it.second }
-        if (rest > 0) top + ChartSlice("Everything else", rest, Color(0xFF90A4AE), null) else top
+        if (rest > 0) top + ChartSlice("Everything else", rest, Color(0xFF90A4AE), null, isRest = true) else top
     }
     val merchants = remember(expenses, categoryById) {
         expenses.filter { it.merchant != null }
@@ -348,7 +353,7 @@ fun HomeScreen(
                         modifier = Modifier.padding(vertical = 24.dp)
                     )
                 } else when (chart) {
-                    ChartKind.CATEGORIES -> DonutChart(slices, expense)
+                    ChartKind.CATEGORIES -> DonutChart(slices, expense, onSliceClick = { sl -> onOpenCategory(sl.category?.id, EntryKind.EXPENSE, selectedAccountId) })
                     ChartKind.OVER_TIME -> BarChart(buckets.map { it.label }, bucketExpense, bucketIncome)
                     ChartKind.TREND -> TrendChart(buckets.map { it.label }, bucketExpense, bucketIncome)
                     ChartKind.MERCHANTS -> TopMerchants(merchants)
@@ -421,7 +426,28 @@ fun HomeScreen(
                     spentByCategory.forEach { (id, value) ->
                         val c = id?.let { categoryById[it] }
                         val limit = if (monthly) id?.let { budgetByCategory[it]?.limitPaise } else null
-                        CategoryRow(c, value, maxCat, limit, if (expense > 0) value * 100 / expense else 0L)
+                        CategoryRow(c, value, maxCat, limit, if (expense > 0) value * 100 / expense else 0L) {
+                            onOpenCategory(id, EntryKind.EXPENSE, selectedAccountId)
+                        }
+                    }
+                    Text(
+                        "Tap a category to see its payments and move them.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        if (incomeByCategory.isNotEmpty()) {
+            item { SectionTitle("Income by category") }
+            item {
+                SoftCard {
+                    val maxInc = incomeByCategory.first().second
+                    incomeByCategory.forEach { (id, value) ->
+                        val c = id?.let { categoryById[it] }
+                        CategoryRow(c, value, maxInc, null, if (income > 0) value * 100 / income else 0L, ofWhat = "income") {
+                            onOpenCategory(id, EntryKind.INCOME, selectedAccountId)
+                        }
                     }
                 }
             }
@@ -553,9 +579,21 @@ private fun AccountCard(balance: AccountBalance, index: Int, selected: Boolean, 
 }
 
 @Composable
-private fun CategoryRow(category: Category?, value: Long, maxValue: Long, limit: Long?, percent: Long) {
+private fun CategoryRow(
+    category: Category?,
+    value: Long,
+    maxValue: Long,
+    limit: Long?,
+    percent: Long,
+    ofWhat: String = "spending",
+    onClick: () -> Unit
+) {
     val color = categoryColor(category)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(
+        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         CategoryBadge(category, size = 38.dp)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row {
@@ -574,7 +612,7 @@ private fun CategoryRow(category: Category?, value: Long, maxValue: Long, limit:
                         .background(if (over) MaterialTheme.colorScheme.error else color)
                 )
             }
-            Text("$percent% of spending", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("$percent% of $ofWhat  ›", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
