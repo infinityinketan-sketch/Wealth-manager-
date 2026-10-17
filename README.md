@@ -116,3 +116,12 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - Saved = income − spent; the summary says how much of it went into investments / FD.
 - "How is this worked out?" on the summary shows the full breakdown.
 - Every category has a "Count in totals" switch; a "Not counted in totals" section lists what is left out.
+
+## v0.9.1: no more dropped alerts
+
+- Real debit/credit alerts are no longer thrown away because of footer lines ("Never share OTP",
+  "Get a loan, apply now", "EMI due…"). OTP / offer / due / failed words only skip messages that do not
+  report a completed debit or credit on an account (`SmsParser.parseWhy`).
+- The first read covers the whole inbox, not only the last 12 months.
+- Home shows "Read N messages · M bank transactions · K not understood"; the "not understood" screen lists
+  those bank messages with the reason and can copy them with long numbers hidden.

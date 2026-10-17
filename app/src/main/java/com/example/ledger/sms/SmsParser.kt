@@ -29,20 +29,44 @@ data class ParsedSms(
 object SmsParser {
 
     /** Bump when the reading rules change: the app then re-reads old messages with the new rules. */
-    const val VERSION = 7
+    const val VERSION = 8
 
     private val amountRegex = Regex("""(?i)(?:rs\.?|inr|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""")
 
-    private val skipWords = listOf(
-        "otp", "one time password", "one-time password", "verification code",
-        "will be debited", "will be credited", "would be debited", "to be debited", "scheduled",
-        "is due", "are due", "due on", "due date", "due by", "min due", "minimum due", "total due",
-        "payment due", "amount due", "overdue", "bill generated", "statement generated", "statement for",
-        "failed", "unsuccessful", "declined", "not successful", "could not", "insufficient", "rejected",
-        "request received", "has requested", "collect request", "is requesting", "pre-approved",
-        "pre approved", "apply now", "click here", "offer", "win ", "reminder", "avail now", "eligible for",
-        "bounced", "dishonour", "returned unpaid", "presented"
+    // Always skipped: the money has not moved yet.
+    private val futureWords = listOf(
+        "will be debited", "will be credited", "would be debited", "to be debited", "is scheduled", "scheduled for",
+        "bill generated", "statement generated", "statement for"
     )
+    // Skipped unless the message clearly reports a completed debit / credit on an account. Banks often
+    // put "Never share your OTP", "Get a loan, apply now" or "EMI due" lines under real alerts.
+    private val dueWords = listOf(
+        "is due", "are due", "due on", "due date", "due by", "min due", "minimum due", "total due",
+        "payment due", "amount due", "overdue"
+    )
+    private val otpWords = listOf("otp", "one time password", "one-time password", "verification code")
+    private val failWords = listOf(
+        "failed", "unsuccessful", "declined", "not successful", "could not", "insufficient", "rejected",
+        "bounced", "dishonour", "returned unpaid"
+    )
+    private val requestWords = listOf("request received", "has requested", "collect request", "is requesting")
+    private val promoWords = listOf(
+        "pre-approved", "pre approved", "apply now", "click here", "offer", "win ", "reminder", "avail now", "eligible for"
+    )
+    private val completedRegex = Regex("""\b(?:debited|credited|spent|withdrawn|deposited|transferred|sent|received|paid)\b""")
+
+    /** Why a message was not read as a transaction; shown on the "messages not understood" screen. */
+    enum class Skip(val label: String) {
+        NOT_BANK("Not from a bank"),
+        PENDING("Not paid yet (due / scheduled)"),
+        OTP("OTP message"),
+        FAILED("Failed or declined"),
+        REQUEST("Payment request"),
+        PROMO("Offer / advert"),
+        NO_AMOUNT("No amount found"),
+        NO_DIRECTION("Could not tell debit or credit"),
+        RECEIPT("Biller receipt (already counted from bank)")
+    }
 
     private val debitWords = listOf(
         "debited", "debit by", "has a debit", "spent", "withdrawn", "withdrawal", "purchase", "paid",
@@ -128,13 +152,32 @@ object SmsParser {
         """(?i)\b(?:avl\.?\s*bal(?:ance)?|available\s*bal(?:ance)?|avbl\.?\s*bal(?:ance)?|a/c\s*bal(?:ance)?|clear\s*bal(?:ance)?|bal(?:ance)?)\b[^0-9]{0,20}?([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""
     )
 
-    fun parse(sender: String, body: String): ParsedSms? {
-        if (senderCore(sender) == null) return null
+    fun parse(sender: String, body: String): ParsedSms? = parseWhy(sender, body).first
+
+    /** An amount, a completed debit/credit word and an account or card number: worth a look if not read. */
+    fun looksLikeMoneyAlert(body: String): Boolean {
+        val lower = body.lowercase()
+        return amountRegex.containsMatchIn(body) && completedRegex.containsMatchIn(lower) && accountRegex.containsMatchIn(body)
+    }
+
+    /** The parsed transaction, or null and the reason it was skipped. */
+    fun parseWhy(sender: String, body: String): Pair<ParsedSms?, Skip?> {
+        if (senderCore(sender) == null) return null to Skip.NOT_BANK
         val text = body.replace("\n", " ").replace(Regex("\\s+"), " ").trim()
         val lower = text.lowercase()
-        if (skipWords.any { lower.contains(it) }) return null
 
-        val amount = transactionAmount(text, lower) ?: return null
+        val completed = completedRegex.containsMatchIn(lower) &&
+            (accountRegex.containsMatchIn(text) || Regex("""\bupi\b""").containsMatchIn(lower))
+        if (futureWords.any { lower.contains(it) }) return null to Skip.PENDING
+        if (!completed) {
+            if (otpWords.any { lower.contains(it) }) return null to Skip.OTP
+            if (failWords.any { lower.contains(it) }) return null to Skip.FAILED
+            if (requestWords.any { lower.contains(it) }) return null to Skip.REQUEST
+            if (dueWords.any { lower.contains(it) }) return null to Skip.PENDING
+            if (promoWords.any { lower.contains(it) }) return null to Skip.PROMO
+        }
+
+        val amount = transactionAmount(text, lower) ?: return null to Skip.NO_AMOUNT
 
         // Only a message about the person's own loan account counts, not an ad footer like "Get an instant loan".
         val loanAccountPhrase = Regex("""\bloan\s*(?:a/c|acct|account|ac\b|no\.?|number)|towards\s+(?:your\s+|the\s+)?(?:loan|emi)\b""")
@@ -156,7 +199,7 @@ object SmsParser {
 
         val debitAt = debitWords.map { lower.indexOf(it) }.filter { it >= 0 }.minOrNull()
         val creditAt = creditWords.map { lower.indexOf(it) }.filter { it >= 0 }.minOrNull()
-        if (debitAt == null && creditAt == null && !isReceipt) return null
+        if (debitAt == null && creditAt == null && !isReceipt) return null to Skip.NO_DIRECTION
         val creditFirst = when {
             debitAt == null -> true
             creditAt == null -> false
@@ -165,7 +208,7 @@ object SmsParser {
 
         // A lender (or a bank's loan desk) saying it received the EMI: for the person that is an EMI spend.
         if (mentionsLoan && !isDisbursal && (creditFirst || debitAt == null) && (lender != null || bank != null)) {
-            return ParsedSms(
+            return Pair(ParsedSms(
                 isIncome = false,
                 amountPaise = amount,
                 bankName = lender ?: bank!!,
@@ -174,14 +217,14 @@ object SmsParser {
                 merchant = lender?.uppercase(),
                 balancePaise = null,
                 categoryHint = "EMI"
-            )
+            ), null)
         }
 
         if (bank == null) {
             // Unknown sender id: accept only a real account alert that names a bank we know.
-            if (lender != null || digits == null) return null
-            bank = bankNamesInBody.firstOrNull { lower.contains(it.first) }?.second ?: return null
-            if (!Regex("""(?i)(?:a/c|acct|account|ac|card)\s*(?:no\.?)?\s*[x*]+\d""").containsMatchIn(text)) return null
+            if (lender != null || digits == null) return null to Skip.NOT_BANK
+            bank = bankNamesInBody.firstOrNull { lower.contains(it.first) }?.second ?: return null to Skip.NOT_BANK
+            if (!Regex("""(?i)(?:a/c|acct|account|ac|card)\s*(?:no\.?)?\s*[x*]+\d""").containsMatchIn(text)) return null to Skip.NOT_BANK
         }
 
         val fromBankAccount = Regex("""(?i)(?<![a-z])(?:a/c|acct|account|ac)(?![a-wyz])""").containsMatchIn(text)
@@ -189,7 +232,7 @@ object SmsParser {
             (lower.contains("towards") || lower.contains("bill") || lower.contains("payment to") || lower.contains("credit card payment"))
         ) {
             // Money left a bank account to pay a credit card bill: a transfer, not spending.
-            return ParsedSms(
+            return Pair(ParsedSms(
                 isIncome = false,
                 amountPaise = amount,
                 bankName = bank,
@@ -198,13 +241,13 @@ object SmsParser {
                 merchant = null,
                 balancePaise = balance,
                 categoryHint = CategoryGuesser.CARD_BILL
-            )
+            ), null)
         }
 
         if (isCard) {
             // On a credit card, "payment received" means the bill was paid: a transfer, not income.
             val paymentToCard = isReceipt || (creditFirst && lower.contains("payment"))
-            return ParsedSms(
+            return Pair(ParsedSms(
                 isIncome = creditFirst || paymentToCard,
                 amountPaise = amount,
                 bankName = bank,
@@ -213,13 +256,13 @@ object SmsParser {
                 merchant = if (paymentToCard) null else findMerchant(text, creditFirst),
                 balancePaise = null,
                 categoryHint = if (paymentToCard) CategoryGuesser.TRANSFER_IN else null
-            )
+            ), null)
         }
 
         // A bank's own "thank you for your payment" style receipt with no account movement wording.
-        if (isReceipt && debitAt == null && !lower.contains("credited")) return null
+        if (isReceipt && debitAt == null && !lower.contains("credited")) return null to Skip.RECEIPT
 
-        return ParsedSms(
+        return Pair(ParsedSms(
             isIncome = creditFirst,
             amountPaise = amount,
             bankName = bank,
@@ -229,7 +272,7 @@ object SmsParser {
             balancePaise = balance,
             // Loan money landing in the account is not income.
             categoryHint = if (isDisbursal && creditFirst) CategoryGuesser.TRANSFER_IN else null
-        )
+        ), null)
     }
 
     private fun transactionAmount(text: String, lower: String): Long? {

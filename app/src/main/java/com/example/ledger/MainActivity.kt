@@ -52,6 +52,7 @@ import com.example.ledger.ui.formatDate
 import com.example.ledger.ui.formatShortDate
 import com.example.ledger.ui.SortScreen
 import com.example.ledger.ui.AddReminderDialog
+import com.example.ledger.ui.UnreadScreen
 import com.example.ledger.ui.sortGroups
 import com.example.ledger.ui.TransactionEditor
 
@@ -242,6 +243,9 @@ private fun LedgerRoot(
     val ruleKeys by viewModel.ruleKeys.collectAsStateWithLifecycle()
     val dues by viewModel.dues.collectAsStateWithLifecycle()
     val countChoices by viewModel.countChoices.collectAsStateWithLifecycle()
+    val unread by viewModel.unread.collectAsStateWithLifecycle()
+    val scanStats by viewModel.scanStats.collectAsStateWithLifecycle()
+    var showUnread by remember { mutableStateOf(false) }
     val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
     var showAddReminder by remember { mutableStateOf(false) }
     val period by viewModel.period.collectAsStateWithLifecycle()
@@ -297,6 +301,8 @@ private fun LedgerRoot(
                 smsGranted = smsGranted,
                 scanning = scan is LedgerViewModel.ScanState.Running,
                 scanProgress = (scan as? LedgerViewModel.ScanState.Running)?.let { it.done to it.total },
+                scanStats = scanStats,
+                onShowUnread = { showUnread = true },
                 dues = dues,
                 suggestions = suggestions,
                 onDuePaid = { viewModel.closeDue(it, paid = true) },
@@ -384,6 +390,16 @@ private fun LedgerRoot(
                 showEditor = true
             },
             onDismiss = { openCategory = null }
+        )
+    }
+
+    if (showUnread) {
+        UnreadScreen(
+            items = unread,
+            stats = scanStats,
+            scanning = scan is LedgerViewModel.ScanState.Running,
+            onFullRescan = viewModel::fullRescan,
+            onDismiss = { showUnread = false }
         )
     }
 

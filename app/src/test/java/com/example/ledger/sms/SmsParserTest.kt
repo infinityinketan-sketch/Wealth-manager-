@@ -299,4 +299,24 @@ class SmsParserTest {
         assertEquals("Interest", CategoryGuesser.guess(true, null, "Int.Pd for the quarter"))
         assertFalse(CategoryGuesser.looksLikePerson("INDIAN CLEARING CORPORATION"))
     }
+
+    @Test fun realAlertsWithFootersAreKept() {
+        val a = parse("VM-ICICIT-S", "ICICI Bank Acct XX374 debited for Rs 800.00 on 16-Oct-26; SHENDE CARDIODIA credited. UPI:629012345678. Call 18002662 for dispute. Never share OTP/PIN with anyone.")
+        assertEquals(80_000L, a.amountPaise)
+        assertEquals("SHENDE CARDIODIA", a.merchant)
+        val b = parse("JD-SBIUPI-S", "Dear UPI user A/C X6141 debited by 650.0 on date 16Oct26 trf to PRAJKTA SHENDE Refno 629012345679. If not u? call 1800111109. Get pre-approved personal loan, apply now -SBI")
+        assertEquals(65_000L, b.amountPaise)
+        val c = parse("AX-HDFCBK-S", "Sent Rs.488.00 From HDFC Bank A/C *1234 To SHRIKRISHNA MEDICAL On 16/10/26 Ref 629012345670. Not You? Call 18002586161. Click here to view offers")
+        assertEquals("Health", CategoryGuesser.guess(false, c.merchant, ""))
+        val d = parse("VM-KOTAKB-S", "Rs.365.00 debited from Kotak Bank AC X2222 to pradeepsweets@okicici on 16-10-26. EMI due on your card? Pay now. UPI Ref 629012345671")
+        assertEquals("PRADEEPSWEETS", d.merchant)
+    }
+
+    @Test fun skipReasonsAreReported() {
+        assertEquals(SmsParser.Skip.OTP, SmsParser.parseWhy("VM-HDFCBK-S", "123456 is your OTP for txn of Rs.500.00 at AMAZON. Do not share.").second)
+        assertEquals(SmsParser.Skip.FAILED, SmsParser.parseWhy("VM-HDFCBK-S", "Payment of Rs.300.00 failed. Amount will be refunded if debited.").second)
+        assertEquals(SmsParser.Skip.PENDING, SmsParser.parseWhy("VM-BAJAJF-S", "Your EMI of Rs 8,450 will be debited on 05-11-26 from a/c XX1234.").second)
+        assertEquals(SmsParser.Skip.NOT_BANK, SmsParser.parseWhy("+919876543210", "debited Rs 500").second)
+        assertEquals(SmsParser.Skip.PROMO, SmsParser.parseWhy("VM-ICICIB-S", "Get a personal loan of up to Rs 25 lakh. Apply now!").second)
+    }
 }

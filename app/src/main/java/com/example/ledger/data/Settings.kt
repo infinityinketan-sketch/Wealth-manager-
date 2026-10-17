@@ -43,7 +43,14 @@ class Settings(context: Context) {
         }.toMap()
         set(value) = prefs.edit().putStringSet(KEY_COUNT, value.map { (id, on) -> id.toString() + ":" + (if (on) "1" else "0") }.toSet()).apply()
 
+    /** Messages read, bank transactions found, bank messages not understood (last full read). */
+    var lastFullScan: Triple<Int, Int, Int>?
+        get() = prefs.getString(KEY_FULL_SCAN, null)?.split(",")?.mapNotNull { it.toIntOrNull() }
+            ?.takeIf { it.size == 3 }?.let { Triple(it[0], it[1], it[2]) }
+        set(value) = prefs.edit().putString(KEY_FULL_SCAN, value?.let { "${it.first},${it.second},${it.third}" }).apply()
+
     private companion object {
+        const val KEY_FULL_SCAN = "last_full_scan"
         const val KEY_COUNT = "count_choices"
         const val KEY_DECLINED = "declined_reminders"
         const val KEY_PARSER_VERSION = "sms_parser_version"

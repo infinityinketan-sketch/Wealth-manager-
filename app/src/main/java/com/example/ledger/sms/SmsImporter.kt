@@ -11,10 +11,14 @@ object SmsImporter {
 
     private const val DAY = 24L * 60 * 60 * 1000
 
-    /** How far back the very first scan looks. */
-    const val FIRST_SCAN_DAYS = 365L
+    /** A bank-looking message that was not turned into a transaction or a bill, and why. */
+    data class Unread(val sender: String, val body: String, val millis: Long, val reason: String)
 
-    data class Result(val scanned: Int, val imported: Int)
+    /**
+     * [scanned] messages read, [found] bank transactions in them (new or already stored), [imported]
+     * new ones, [unread] bank messages that were not understood (newest first, at most 300).
+     */
+    data class Result(val scanned: Int, val found: Int, val imported: Int, val unread: List<Unread>)
 
     fun smsKey(sender: String, millis: Long, body: String) = sender + "|" + millis + "|" + body.hashCode()
 
@@ -53,7 +57,10 @@ object SmsImporter {
     ): Result =
         withContext(Dispatchers.IO) {
             val now = System.currentTimeMillis()
-            val since = if (lastScanMillis <= 0L) now - FIRST_SCAN_DAYS * DAY else lastScanMillis - 2 * DAY
+            // The first scan reads the whole inbox, however old (like Walnut does).
+            val since = if (lastScanMillis <= 0L) 0L else lastScanMillis - 2 * DAY
+            var found = 0
+            val unread = ArrayDeque<Unread>()
             val ctx = repo.newImportContext()
             var scanned = 0
             var imported = 0
@@ -77,14 +84,29 @@ object SmsImporter {
                         val body = cursor.getString(iBody) ?: continue
                         val millis = cursor.getLong(iDate)
                         val smsDate = java.time.Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
-                        DueParser.parse(sender, body, smsDate)?.let { repo.recordDue(it, millis) }
-                        val parsed = SmsParser.parse(sender, body) ?: continue
+                        val due = DueParser.parse(sender, body, smsDate)
+                        if (due != null) repo.recordDue(due, millis)
+                        val (parsed, why) = SmsParser.parseWhy(sender, body)
+                        if (parsed == null) {
+                            val bankSender = SmsParser.bankFromSender(sender) != null || SmsParser.lenderFromSender(sender) != null
+                            val interesting = due == null && why != null && when (why) {
+                                SmsParser.Skip.OTP, SmsParser.Skip.PROMO -> false
+                                SmsParser.Skip.NOT_BANK -> SmsParser.looksLikeMoneyAlert(body)
+                                else -> bankSender || SmsParser.looksLikeMoneyAlert(body)
+                            }
+                            if (interesting) {
+                                unread.addFirst(Unread(sender, body, millis, why!!.label))
+                                if (unread.size > 300) unread.removeLast()
+                            }
+                            continue
+                        }
+                        found++
                         if (repo.recordSms(ctx, parsed, smsKey(sender, millis, body), millis, body)) imported++
                     }
                 }
             } catch (e: SecurityException) {
                 // Permission was withdrawn; nothing to import.
             }
-            Result(scanned, imported)
+            Result(scanned, found, imported, unread.toList())
         }
 }

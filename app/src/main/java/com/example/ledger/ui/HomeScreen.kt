@@ -96,6 +96,8 @@ fun HomeScreen(
     smsGranted: Boolean,
     scanning: Boolean,
     scanProgress: Pair<Int, Int>?,
+    scanStats: Triple<Int, Int, Int>?,
+    onShowUnread: () -> Unit,
     dues: List<com.example.ledger.data.Due>,
     suggestions: List<com.example.ledger.core.RepeatingPayment>,
     onDuePaid: (com.example.ledger.data.Due) -> Unit,
@@ -360,16 +362,35 @@ fun HomeScreen(
                     )
                     Button(onClick = onEnableSms) { Text("Allow and scan messages") }
                 }
-                lastImported != null -> Row(
+                lastImported != null || scanStats != null -> Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        if (lastImported > 0) "Found $lastImported new transactions in your messages" else "Messages are up to date",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f).padding(end = 12.dp)
-                    )
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        if (scanStats != null) {
+                            Text(
+                                "Read %,d messages · %,d bank transactions".format(scanStats.first, scanStats.second),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (scanStats.third > 0) {
+                                Text(
+                                    "${scanStats.third} bank messages not understood ›",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable(onClick = onShowUnread)
+                                )
+                            }
+                        }
+                        if (lastImported != null && lastImported > 0) {
+                            Text(
+                                "$lastImported new just now",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     OutlinedButton(onClick = onScanAgain) { Text("Rescan") }
                 }
                 else -> {}

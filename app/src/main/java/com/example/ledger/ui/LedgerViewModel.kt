@@ -86,6 +86,20 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private val scanState = MutableStateFlow<ScanState>(ScanState.Idle)
+
+    /** Bank messages the last scans could not read, for the "not understood" screen. */
+    private val unreadState = MutableStateFlow<List<SmsImporter.Unread>>(emptyList())
+    val unread: StateFlow<List<SmsImporter.Unread>> = unreadState
+
+    /** From the last full read of the inbox: messages read, bank transactions found, not understood. */
+    private val statsState = MutableStateFlow(settings.lastFullScan)
+    val scanStats: StateFlow<Triple<Int, Int, Int>?> = statsState
+
+    /** Reads the whole inbox again from the start (stored entries and the person's fixes are kept). */
+    fun fullRescan() {
+        settings.lastSmsScanMillis = 0L
+        scanSms()
+    }
     val scan: StateFlow<ScanState> = scanState
 
     /** Reads bank messages from the SMS inbox (needs the SMS permission). Safe to call repeatedly. */
@@ -98,7 +112,7 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
             // Learned "every time" merchant choices and manual entries are kept.
             val rulesChanged = settings.smsParserVersion != SmsParser.VERSION
             if (rulesChanged) repo.clearSmsData()
-            val full = rulesChanged || repo.countSmsTransactions() == 0
+            val full = rulesChanged || repo.countSmsTransactions() == 0 || settings.lastSmsScanMillis == 0L
             val result = SmsImporter.importInbox(app, repo, if (full) 0L else settings.lastSmsScanMillis) { done, total ->
                 scanState.value = ScanState.Running(done, total)
             }
@@ -106,6 +120,13 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
             refreshSuggestions()
             settings.smsParserVersion = SmsParser.VERSION
             settings.lastSmsScanMillis = System.currentTimeMillis()
+            if (full) {
+                settings.lastFullScan = Triple(result.scanned, result.found, result.unread.size)
+                unreadState.value = result.unread
+            } else if (result.unread.isNotEmpty()) {
+                unreadState.value = (result.unread + unreadState.value).distinctBy { it.sender + it.millis }.take(300)
+            }
+            statsState.value = settings.lastFullScan
             scanState.value = ScanState.Done(result.scanned, result.imported)
         }
     }
