@@ -91,6 +91,14 @@ fun HomeScreen(
     budgets: List<Budget>,
     smsGranted: Boolean,
     scanning: Boolean,
+    scanProgress: Pair<Int, Int>?,
+    dues: List<com.example.ledger.data.Due>,
+    suggestions: List<com.example.ledger.core.RepeatingPayment>,
+    onDuePaid: (com.example.ledger.data.Due) -> Unit,
+    onDueDismiss: (com.example.ledger.data.Due) -> Unit,
+    onAcceptSuggestion: (com.example.ledger.core.RepeatingPayment) -> Unit,
+    onDeclineSuggestion: (com.example.ledger.core.RepeatingPayment) -> Unit,
+    onAddReminder: () -> Unit,
     lastImported: Int?,
     onEnableSms: () -> Unit,
     onScanAgain: () -> Unit,
@@ -300,9 +308,22 @@ fun HomeScreen(
         // ---- SMS status ----
         item {
             when {
-                scanning -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text("Reading your bank messages…", style = MaterialTheme.typography.bodyMedium)
+                scanning -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val (done, total) = scanProgress ?: (0 to 0)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Text(
+                            if (total > 0) "Reading your messages $done/$total" else "Reading your messages…",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    if (total > 0) {
+                        LinearProgressIndicator(
+                            progress = { done.toFloat() / total },
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
                 !smsGranted -> SoftCard {
                     Text("Track spending automatically", fontWeight = FontWeight.SemiBold)
@@ -326,6 +347,21 @@ fun HomeScreen(
                     OutlinedButton(onClick = onScanAgain) { Text("Rescan") }
                 }
                 else -> {}
+            }
+        }
+
+        // ---- dues & reminders ----
+        if (selectedAccountId == null) {
+            item {
+                DuesSection(
+                    dues = dues,
+                    suggestions = suggestions,
+                    onPaid = onDuePaid,
+                    onDismiss = onDueDismiss,
+                    onAccept = onAcceptSuggestion,
+                    onDecline = onDeclineSuggestion,
+                    onAdd = onAddReminder
+                )
             }
         }
 

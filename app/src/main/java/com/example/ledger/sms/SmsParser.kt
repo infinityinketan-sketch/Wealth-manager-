@@ -29,7 +29,7 @@ data class ParsedSms(
 object SmsParser {
 
     /** Bump when the reading rules change: the app then re-reads old messages with the new rules. */
-    const val VERSION = 5
+    const val VERSION = 6
 
     private val amountRegex = Regex("""(?i)(?:rs\.?|inr|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""")
 

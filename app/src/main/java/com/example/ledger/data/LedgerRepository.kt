@@ -2,7 +2,14 @@ package com.example.ledger.data
 
 import androidx.room.withTransaction
 import com.example.ledger.core.Recurrence
+import com.example.ledger.core.MoneyMove
+import com.example.ledger.core.PaymentPoint
+import com.example.ledger.core.RecurringDetector
+import com.example.ledger.core.RepeatingPayment
+import com.example.ledger.core.TransferMatcher
 import com.example.ledger.sms.CategoryGuesser
+import com.example.ledger.sms.DueKindHint
+import com.example.ledger.sms.DueNotice
 import com.example.ledger.sms.ParsedSms
 import com.example.ledger.sms.SmsAccountKind
 import com.example.ledger.sms.StarterCategories
@@ -17,6 +24,7 @@ class LedgerRepository(private val db: LedgerDatabase) {
     private val budgets = db.budgetDao()
     private val recurring = db.recurringDao()
     private val merchantRules = db.merchantRuleDao()
+    private val dues = db.dueDao()
 
     // ---- reads ----
     fun observeTransactions(fromDay: Long, toDay: Long): Flow<List<LedgerTransaction>> =
@@ -28,6 +36,8 @@ class LedgerRepository(private val db: LedgerDatabase) {
     fun observeBudgets(): Flow<List<Budget>> = budgets.observeAll()
     fun observeRecurring(): Flow<List<RecurringRule>> = recurring.observeAll()
     fun observeRuleKeys(): Flow<List<String>> = merchantRules.observeKeys()
+    fun observeOpenDues(): Flow<List<Due>> = dues.observeOpen()
+    fun observeDueMerchantKeys(): Flow<List<String>> = dues.observeMerchantKeys()
 
     // ---- transactions ----
     suspend fun saveTransaction(transaction: LedgerTransaction) {
@@ -238,6 +248,13 @@ class LedgerRepository(private val db: LedgerDatabase) {
      * After an import: an account created from messages without a number ("ICICI Bank") is merged
      * into that bank's numbered account when there is exactly one.
      */
+    /** Everything that should run after new messages were read. */
+    suspend fun afterImport() {
+        finishImport()
+        matchSelfTransfers()
+        checkDuesPaid()
+    }
+
     suspend fun finishImport() {
         val all = accounts.smsAccounts()
         for (generic in all.filter { it.smsKey!!.endsWith("|") }) {
@@ -298,6 +315,150 @@ class LedgerRepository(private val db: LedgerDatabase) {
                 ?: continue
             if (newId != t.categoryId) transactions.update(t.copy(categoryId = newId))
         }
+    }
+
+    // ---- self-transfers ----
+
+    /**
+     * Money that left one of the person's accounts and arrived in another of their accounts (same
+     * amount, close in time) is a self-transfer: marked so it counts as neither spending nor income.
+     * Only entries the app was unsure about are touched; the person's own choices stay.
+     */
+    suspend fun matchSelfTransfers(nowMillis: Long = System.currentTimeMillis()) {
+        val cats = categories.all()
+        fun idOf(name: String, kind: EntryKind) = cats.firstOrNull { it.name == name && it.kind == kind }?.id
+        val selfId = idOf(CategoryGuesser.SELF_TRANSFER, EntryKind.EXPENSE) ?: return
+        val inId = idOf(CategoryGuesser.TRANSFER_IN, EntryKind.INCOME) ?: return
+        val cardBillId = idOf(CategoryGuesser.CARD_BILL, EntryKind.EXPENSE) ?: selfId
+        val fallbackIds = cats.filter { it.name in StarterCategories.fallbackNames }.map { it.id }.toSet()
+        val ruled = merchantRules.all().map { it.merchantKey }.toSet()
+        val types = accounts.smsAccounts().associate { it.id to it.type }
+
+        val candidates = transactions.ownAccountSmsSince(nowMillis - 400 * day)
+            .filter { (it.categoryId == null || it.categoryId in fallbackIds) && (it.merchantKey == null || it.merchantKey !in ruled) }
+        val byId = candidates.associateBy { it.id }
+        val pairs = TransferMatcher.pairs(candidates.map { MoneyMove(it.id, it.accountId, it.kind == EntryKind.INCOME, it.amountPaise, it.epochMillis) })
+        if (pairs.isEmpty()) return
+        db.withTransaction {
+            for ((debitId, creditId) in pairs) {
+                val credit = byId[creditId] ?: continue
+                val toCard = types[credit.accountId] == AccountType.CARD
+                transactions.setCategory(listOf(debitId), if (toCard) cardBillId else selfId)
+                transactions.setCategory(listOf(creditId), inId)
+            }
+        }
+    }
+
+    // ---- dues & reminders ----
+
+    private fun dueKind(h: DueKindHint) = when (h) {
+        DueKindHint.CARD -> DueKind.CARD
+        DueKindHint.LOAN -> DueKind.LOAN
+        DueKindHint.INSURANCE -> DueKind.INSURANCE
+        DueKindHint.UTILITY -> DueKind.UTILITY
+        DueKindHint.OTHER -> DueKind.OTHER
+    }
+
+    /** Stores a bill read from SMS; the same bill seen again is ignored. */
+    suspend fun openDues(): List<Due> = dues.open()
+
+    suspend fun recordDue(notice: DueNotice, smsMillis: Long) {
+        val kind = dueKind(notice.kind)
+        dues.insertIgnore(
+            Due(
+                dueKey = listOf(kind.name, notice.title, notice.digits ?: "", notice.dueDate.toEpochDay()).joinToString("|"),
+                title = notice.title,
+                digits = notice.digits,
+                kind = kind,
+                amountPaise = notice.amountPaise,
+                minDuePaise = notice.minDuePaise,
+                dueEpochDay = notice.dueDate.toEpochDay(),
+                merchantKey = null,
+                repeatMonths = null,
+                createdMillis = smsMillis
+            )
+        )
+    }
+
+    suspend fun addReminder(title: String, amountPaise: Long, date: LocalDate, repeatMonths: Int?, merchantKey: String? = null) {
+        val kind = if (merchantKey != null) DueKind.REPEATING else DueKind.OTHER
+        dues.insertIgnore(
+            Due(
+                dueKey = "REMINDER|" + (merchantKey ?: title.lowercase()) + "|" + date.toEpochDay(),
+                title = title.trim(),
+                digits = null,
+                kind = kind,
+                amountPaise = amountPaise,
+                minDuePaise = null,
+                dueEpochDay = date.toEpochDay(),
+                merchantKey = merchantKey,
+                repeatMonths = repeatMonths,
+                createdMillis = System.currentTimeMillis()
+            )
+        )
+    }
+
+    /** Marks a due paid (or dismissed); a repeating one moves on to its next date. */
+    suspend fun closeDue(due: Due, paid: Boolean) {
+        dues.update(due.copy(status = if (paid) DueStatus.PAID else DueStatus.DISMISSED))
+        val months = due.repeatMonths
+        if (months != null) {
+            val next = LocalDate.ofEpochDay(due.dueEpochDay).plusMonths(months.toLong())
+            dues.insertIgnore(
+                due.copy(
+                    id = 0,
+                    dueKey = due.dueKey.substringBeforeLast("|") + "|" + next.toEpochDay(),
+                    dueEpochDay = next.toEpochDay(),
+                    status = DueStatus.OPEN,
+                    createdMillis = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * Looks for the payment of each open due among the transactions (same amount, card payment
+     * received, or the same merchant) and closes it. Old one-off dues nobody paid are put away.
+     */
+    suspend fun checkDuesPaid(today: LocalDate = LocalDate.now(), zone: java.time.ZoneId = java.time.ZoneId.systemDefault()) {
+        val cats = categories.all()
+        val cardBillId = cats.firstOrNull { it.name == CategoryGuesser.CARD_BILL }?.id
+        val accountById = accounts.smsAccounts().associateBy { it.id }
+        for (d in dues.open()) {
+            val dueDate = LocalDate.ofEpochDay(d.dueEpochDay)
+            val from = minOf(d.createdMillis, dueDate.minusDays(10).atStartOfDay(zone).toInstant().toEpochMilli()) - day
+            val to = dueDate.plusDays(5).atStartOfDay(zone).toInstant().toEpochMilli()
+            val txs = transactions.betweenMillis(from, to)
+            val paid = txs.any { t ->
+                val near = Math.abs(t.amountPaise - d.amountPaise) <= 100
+                when {
+                    d.merchantKey != null -> t.kind == EntryKind.EXPENSE && t.merchantKey == d.merchantKey
+                    d.kind == DueKind.CARD -> {
+                        val acc = accountById[t.accountId]
+                        val cardMatch = acc != null && acc.type == AccountType.CARD && t.kind == EntryKind.INCOME &&
+                            (d.digits == null || acc.smsKey?.endsWith(d.digits!!.takeLast(3)) == true)
+                        val billPaid = t.kind == EntryKind.EXPENSE && t.categoryId == cardBillId &&
+                            t.amountPaise >= (d.minDuePaise ?: d.amountPaise)
+                        cardMatch || billPaid || (t.kind == EntryKind.EXPENSE && near)
+                    }
+                    else -> t.kind == EntryKind.EXPENSE && near && t.epochMillis >= d.createdMillis - day
+                }
+            }
+            when {
+                paid -> closeDue(d, paid = true)
+                d.repeatMonths == null && dueDate.isBefore(today.minusDays(30)) -> dues.update(d.copy(status = DueStatus.DISMISSED))
+                d.repeatMonths != null && dueDate.isBefore(today.minusDays(20)) -> closeDue(d, paid = false)
+            }
+        }
+    }
+
+    /** Payments that repeat at a steady rhythm, for "Set reminder?" suggestions. */
+    suspend fun findRepeating(today: LocalDate = LocalDate.now()): List<RepeatingPayment> {
+        val excluded = categories.all().filter { it.name in StarterCategories.excludedNames }.map { it.id }.toSet()
+        val points = transactions.merchantExpensesSince(today.minusDays(400).toEpochDay())
+            .filter { it.categoryId !in excluded }
+            .map { PaymentPoint(it.merchantKey!!, it.merchant ?: it.merchantKey!!, it.amountPaise, LocalDate.ofEpochDay(it.epochDay)) }
+        return RecurringDetector.find(points, today)
     }
 
     // ---- accounts ----

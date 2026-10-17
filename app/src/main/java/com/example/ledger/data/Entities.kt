@@ -110,3 +110,34 @@ data class AccountBalance(
     val latestBalancePaise: Long?,
     val latestBalanceMillis: Long
 )
+
+enum class DueKind(val label: String) {
+    CARD("Credit card bill"),
+    LOAN("Loan EMI"),
+    INSURANCE("Insurance premium"),
+    UTILITY("Bill"),
+    REPEATING("Regular payment"),
+    OTHER("Reminder")
+}
+
+enum class DueStatus { OPEN, PAID, DISMISSED }
+
+/**
+ * A bill or payment coming up: read from a bill SMS, spotted as a repeating payment, or added by
+ * the person. [repeatMonths] set means the next one is created when this one is paid.
+ */
+@Entity(tableName = "dues", indices = [Index(value = ["dueKey"], unique = true)])
+data class Due(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val dueKey: String,
+    val title: String,
+    val digits: String?,
+    val kind: DueKind,
+    val amountPaise: Long,
+    val minDuePaise: Long?,
+    val dueEpochDay: Long,
+    val status: DueStatus = DueStatus.OPEN,
+    val merchantKey: String?,
+    val repeatMonths: Int?,
+    val createdMillis: Long
+)

@@ -87,3 +87,14 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 
 - Tap a category (Spending / Income by category, or the donut legend) to see its entries for the period,
   search them, tick several (or Select all) and "Move to…" another category, optionally remembering the shops.
+
+## v0.8.0: dues & reminders, self-transfers
+
+- Bill SMS (card statements, electricity, phone, gas, loan EMIs, insurance premiums) become dues with a date
+  and amount (`sms/DueParser.kt`); they close themselves when the payment shows up, or tap Paid.
+- Regular payments are spotted (`core/RecurringDetector.kt`): "Repeats quarterly · ₹1,740 — Set reminder?".
+- Manual reminders with repeat; daily notification for anything due within 2 days.
+- Money moved between the person's own accounts is matched (`core/TransferMatcher.kt`) and kept out of
+  spending and income.
+- First scan shows "Reading your messages 13100/18870".
+- Database version 3 adds the `dues` table with a migration (nothing is lost).

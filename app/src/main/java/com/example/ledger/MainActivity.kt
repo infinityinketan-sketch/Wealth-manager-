@@ -50,6 +50,7 @@ import com.example.ledger.ui.CategoryScreen
 import com.example.ledger.ui.formatDate
 import com.example.ledger.ui.formatShortDate
 import com.example.ledger.ui.SortScreen
+import com.example.ledger.ui.AddReminderDialog
 import com.example.ledger.ui.sortGroups
 import com.example.ledger.ui.TransactionEditor
 
@@ -87,7 +88,9 @@ class MainActivity : FragmentActivity() {
         }
 
     private fun requestSms() {
-        smsPermissionLauncher.launch(arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS))
+        val wanted = mutableListOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)
+        if (android.os.Build.VERSION.SDK_INT >= 33) wanted.add(Manifest.permission.POST_NOTIFICATIONS)
+        smsPermissionLauncher.launch(wanted.toTypedArray())
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -236,6 +239,9 @@ private fun LedgerRoot(
     // The category opened from the home screen: (category id or null for uncategorised, kind, account filter).
     var openCategory by remember { mutableStateOf<Triple<Long?, EntryKind, Long?>?>(null) }
     val ruleKeys by viewModel.ruleKeys.collectAsStateWithLifecycle()
+    val dues by viewModel.dues.collectAsStateWithLifecycle()
+    val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
+    var showAddReminder by remember { mutableStateOf(false) }
     val period by viewModel.period.collectAsStateWithLifecycle()
     val periodChoice by viewModel.periodChoice.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
@@ -288,6 +294,14 @@ private fun LedgerRoot(
                 budgets = budgets,
                 smsGranted = smsGranted,
                 scanning = scan is LedgerViewModel.ScanState.Running,
+                scanProgress = (scan as? LedgerViewModel.ScanState.Running)?.let { it.done to it.total },
+                dues = dues,
+                suggestions = suggestions,
+                onDuePaid = { viewModel.closeDue(it, paid = true) },
+                onDueDismiss = { viewModel.closeDue(it, paid = false) },
+                onAcceptSuggestion = viewModel::acceptSuggestion,
+                onDeclineSuggestion = viewModel::declineSuggestion,
+                onAddReminder = { showAddReminder = true },
                 lastImported = (scan as? LedgerViewModel.ScanState.Done)?.imported,
                 onEnableSms = onEnableSms,
                 onScanAgain = viewModel::scanSms,
@@ -366,6 +380,10 @@ private fun LedgerRoot(
             },
             onDismiss = { openCategory = null }
         )
+    }
+
+    if (showAddReminder) {
+        AddReminderDialog(onSave = viewModel::addReminder, onDismiss = { showAddReminder = false })
     }
 
     if (showSort) {

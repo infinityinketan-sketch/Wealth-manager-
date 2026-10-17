@@ -29,7 +29,13 @@ class Settings(context: Context) {
         get() = prefs.getInt(KEY_PARSER_VERSION, 0)
         set(value) = prefs.edit().putInt(KEY_PARSER_VERSION, value).apply()
 
+    /** Merchants the person said "No" to when asked to set a reminder. */
+    var declinedReminders: Set<String>
+        get() = prefs.getStringSet(KEY_DECLINED, emptySet())?.toSet() ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_DECLINED, value).apply()
+
     private companion object {
+        const val KEY_DECLINED = "declined_reminders"
         const val KEY_PARSER_VERSION = "sms_parser_version"
         const val KEY_SMS_PROMPT = "sms_prompt_done"
         const val KEY_LAST_SCAN = "last_sms_scan"

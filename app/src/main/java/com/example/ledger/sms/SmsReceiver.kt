@@ -23,10 +23,13 @@ class SmsReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                val smsDate = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                DueParser.parse(sender, body, smsDate)?.let { repo.recordDue(it, millis) }
                 val parsed = SmsParser.parse(sender, body)
                 if (parsed != null) {
                     repo.recordSms(repo.newImportContext(), parsed, SmsImporter.smsKey(sender, millis, body), millis, body)
                 }
+                repo.afterImport()
             } finally {
                 pending.finish()
             }

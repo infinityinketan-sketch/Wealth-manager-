@@ -16,6 +16,8 @@ import com.example.ledger.data.Category
 import com.example.ledger.data.EntryKind
 import com.example.ledger.data.LedgerTransaction
 import com.example.ledger.data.RecurringRule
+import com.example.ledger.data.Due
+import com.example.ledger.core.RepeatingPayment
 import com.example.ledger.sms.SmsImporter
 import com.example.ledger.sms.SmsParser
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -79,7 +81,7 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     /** null = never scanned this session; otherwise the progress of reading the SMS inbox. */
     sealed interface ScanState {
         data object Idle : ScanState
-        data object Running : ScanState
+        data class Running(val done: Int, val total: Int) : ScanState
         data class Done(val scanned: Int, val imported: Int) : ScanState
     }
 
@@ -88,8 +90,8 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Reads bank messages from the SMS inbox (needs the SMS permission). Safe to call repeatedly. */
     fun scanSms() {
-        if (scanState.value == ScanState.Running) return
-        scanState.value = ScanState.Running
+        if (scanState.value is ScanState.Running) return
+        scanState.value = ScanState.Running(0, 0)
         viewModelScope.launch {
             repo.ensureStarterCategories()
             // New reading rules: forget old SMS results and read the whole inbox again.
@@ -97,13 +99,54 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
             val rulesChanged = settings.smsParserVersion != SmsParser.VERSION
             if (rulesChanged) repo.clearSmsData()
             val full = rulesChanged || repo.countSmsTransactions() == 0
-            val result = SmsImporter.importInbox(app, repo, if (full) 0L else settings.lastSmsScanMillis)
-            repo.finishImport()
+            val result = SmsImporter.importInbox(app, repo, if (full) 0L else settings.lastSmsScanMillis) { done, total ->
+                scanState.value = ScanState.Running(done, total)
+            }
+            repo.afterImport()
+            refreshSuggestions()
             settings.smsParserVersion = SmsParser.VERSION
             settings.lastSmsScanMillis = System.currentTimeMillis()
             scanState.value = ScanState.Done(result.scanned, result.imported)
         }
     }
+
+    // ---- dues & reminders ----
+
+    val dues: StateFlow<List<Due>> = repo.observeOpenDues().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val dueMerchantKeys: StateFlow<Set<String>> = repo.observeDueMerchantKeys().map { it.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    private val repeatingState = MutableStateFlow<List<RepeatingPayment>>(emptyList())
+    private val declinedState = MutableStateFlow(settings.declinedReminders)
+
+    /** Regular payments the app spotted that have no reminder yet and were not declined. */
+    val suggestions: StateFlow<List<RepeatingPayment>> = combine(repeatingState, dueMerchantKeys, declinedState) { list, keys, no ->
+        list.filter { it.merchantKey !in keys && it.merchantKey !in no }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private fun refreshSuggestions() {
+        viewModelScope.launch { repeatingState.value = repo.findRepeating() }
+    }
+
+    fun acceptSuggestion(p: RepeatingPayment) {
+        viewModelScope.launch { repo.addReminder(titleCase(p.name), p.amountPaise, p.nextDate, p.months, p.merchantKey) }
+    }
+
+    fun declineSuggestion(p: RepeatingPayment) {
+        settings.declinedReminders = settings.declinedReminders + p.merchantKey
+        declinedState.value = settings.declinedReminders
+    }
+
+    fun addReminder(title: String, amountPaise: Long, date: LocalDate, repeatMonths: Int?) {
+        viewModelScope.launch { repo.addReminder(title, amountPaise, date, repeatMonths) }
+    }
+
+    fun closeDue(due: Due, paid: Boolean) {
+        viewModelScope.launch { repo.closeDue(due, paid) }
+    }
+
+    private fun titleCase(s: String) = s.lowercase().split(" ").joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
 
     /** Saves the person's category choice for a merchant and applies it to all of that merchant's entries. */
     fun recategorize(items: List<LedgerTransaction>, categoryId: Long, remember: Boolean) {
@@ -116,6 +159,7 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         viewModelScope.launch { repo.ensureStarterCategories() }
+        refreshSuggestions()
         // Entries that came due while the app was closed show up immediately.
         viewModelScope.launch { repo.generateDueRecurring(LocalDate.now()) }
     }

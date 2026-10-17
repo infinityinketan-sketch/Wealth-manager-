@@ -21,6 +21,19 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE smsKey IS NOT NULL AND merchant IS NOT NULL AND (categoryId IS NULL OR categoryId IN (:ids))")
     suspend fun uncertain(ids: List<Long>): List<LedgerTransaction>
 
+    /** SMS entries in bank and card accounts since a time: candidates for self-transfer matching. */
+    @Query(
+        "SELECT t.* FROM transactions t JOIN accounts a ON a.id = t.accountId " +
+            "WHERE t.smsKey IS NOT NULL AND a.type IN ('BANK', 'CARD') AND t.epochMillis >= :fromMillis"
+    )
+    suspend fun ownAccountSmsSince(fromMillis: Long): List<LedgerTransaction>
+
+    @Query("SELECT * FROM transactions WHERE epochMillis BETWEEN :fromMillis AND :toMillis")
+    suspend fun betweenMillis(fromMillis: Long, toMillis: Long): List<LedgerTransaction>
+
+    @Query("SELECT * FROM transactions WHERE kind = 'EXPENSE' AND merchantKey IS NOT NULL AND epochDay >= :fromDay")
+    suspend fun merchantExpensesSince(fromDay: Long): List<LedgerTransaction>
+
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE id IN (:ids)")
     suspend fun setCategory(ids: List<Long>, categoryId: Long)
 
@@ -181,4 +194,22 @@ interface RecurringDao {
 
     @Query("SELECT * FROM recurring_rules WHERE active = 1")
     suspend fun activeRules(): List<RecurringRule>
+}
+
+@Dao
+interface DueDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIgnore(due: Due): Long
+
+    @Update
+    suspend fun update(due: Due)
+
+    @Query("SELECT * FROM dues WHERE status = 'OPEN' ORDER BY dueEpochDay")
+    fun observeOpen(): Flow<List<Due>>
+
+    @Query("SELECT * FROM dues WHERE status = 'OPEN'")
+    suspend fun open(): List<Due>
+
+    @Query("SELECT DISTINCT merchantKey FROM dues WHERE merchantKey IS NOT NULL")
+    fun observeMerchantKeys(): Flow<List<String>>
 }

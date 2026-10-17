@@ -45,7 +45,12 @@ object SmsImporter {
         }
     }
 
-    suspend fun importInbox(context: Context, repo: LedgerRepository, lastScanMillis: Long): Result =
+    suspend fun importInbox(
+        context: Context,
+        repo: LedgerRepository,
+        lastScanMillis: Long,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }
+    ): Result =
         withContext(Dispatchers.IO) {
             val now = System.currentTimeMillis()
             val since = if (lastScanMillis <= 0L) now - FIRST_SCAN_DAYS * DAY else lastScanMillis - 2 * DAY
@@ -63,11 +68,16 @@ object SmsImporter {
                     val iAddress = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
                     val iBody = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
                     val iDate = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
+                    val total = cursor.count
+                    val zone = java.time.ZoneId.systemDefault()
                     while (cursor.moveToNext()) {
                         scanned++
+                        if (scanned % 100 == 0 || scanned == total) onProgress(scanned, total)
                         val sender = cursor.getString(iAddress) ?: continue
                         val body = cursor.getString(iBody) ?: continue
                         val millis = cursor.getLong(iDate)
+                        val smsDate = java.time.Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+                        DueParser.parse(sender, body, smsDate)?.let { repo.recordDue(it, millis) }
                         val parsed = SmsParser.parse(sender, body) ?: continue
                         if (repo.recordSms(ctx, parsed, smsKey(sender, millis, body), millis, body)) imported++
                     }

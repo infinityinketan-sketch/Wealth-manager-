@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.ledger.sms.StarterCategories
 
@@ -14,9 +15,10 @@ import com.example.ledger.sms.StarterCategories
         LedgerTransaction::class,
         Budget::class,
         RecurringRule::class,
-        MerchantRule::class
+        MerchantRule::class,
+        Due::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class LedgerDatabase : RoomDatabase() {
@@ -26,14 +28,29 @@ abstract class LedgerDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun recurringDao(): RecurringDao
     abstract fun merchantRuleDao(): MerchantRuleDao
+    abstract fun dueDao(): DueDao
 
     companion object {
         fun build(context: Context): LedgerDatabase =
             Room.databaseBuilder(context.applicationContext, LedgerDatabase::class.java, "ledger.db")
                 .addCallback(SeedCallback)
+                .addMigrations(MIGRATION_2_3)
                 // Test builds only: moving from the empty stage-1 database simply starts fresh.
                 .fallbackToDestructiveMigration()
                 .build()
+    }
+
+    /** Version 3 adds the dues table; everything already stored (and learned) is kept. */
+    private object MIGRATION_2_3 : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `dues` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `dueKey` TEXT NOT NULL, " +
+                    "`title` TEXT NOT NULL, `digits` TEXT, `kind` TEXT NOT NULL, `amountPaise` INTEGER NOT NULL, " +
+                    "`minDuePaise` INTEGER, `dueEpochDay` INTEGER NOT NULL, `status` TEXT NOT NULL, `merchantKey` TEXT, " +
+                    "`repeatMonths` INTEGER, `createdMillis` INTEGER NOT NULL)"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_dues_dueKey` ON `dues` (`dueKey`)")
+        }
     }
 
     /** First-run data: a Cash account and the starter categories the person can edit. */
