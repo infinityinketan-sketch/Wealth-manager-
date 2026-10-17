@@ -110,6 +110,16 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // ---- what counts in totals ----
+
+    private val countState = MutableStateFlow(settings.countChoices)
+    val countChoices: StateFlow<Map<Long, Boolean>> = countState
+
+    fun setCounted(categoryId: Long, counted: Boolean) {
+        settings.countChoices = settings.countChoices + (categoryId to counted)
+        countState.value = settings.countChoices
+    }
+
     // ---- dues & reminders ----
 
     val dues: StateFlow<List<Due>> = repo.observeOpenDues().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

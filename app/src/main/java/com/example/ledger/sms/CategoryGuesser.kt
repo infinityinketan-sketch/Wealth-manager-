@@ -216,13 +216,25 @@ object CategoryGuesser {
     )
 
     private val incomeRules: List<Pair<String, List<String>>> = listOf(
+        // Money coming back from the person's own FD / RD / transfers: not income.
         TRANSFER_IN to listOf(
             "fd closure", "fd matur", "maturity", "premature", "fixed deposit", "term deposit", "sweep", "redemption",
-            "redeemed", "self transfer", "own account", "own a/c", "disburs", "rd closure", "loan amount"
+            "redeemed", "self transfer", "own account", "own a/c", "disburs", "rd closure", "loan amount", "withdrawal from",
+            "payout", "pay out", "liquidat", "sell proceeds", "sale proceeds"
+        ),
+        "Interest" to listOf("interest", "int pd", "int.pd", "int. pd", "int cr", "int.cr", "int credit", "dividend", "sb int"),
+        // Money back from brokers, mutual funds and other investments: the person's own money returning.
+        TRANSFER_IN to listOf(
+            "zerodha", "groww", "nextbillion", "upstox", "rksv", "kuvera", "paytm money", "indian clearing", "iccl",
+            "nse clearing", "nsccl", "bse ltd", "bse limited", "indian clearing corp", "clearing corp", "cams ", "camsonline",
+            "kfin", "karvy", "mutual fund", "mf ", "amc", "asset management", "angel one", "angelone", "angel broking",
+            "dhan ", "raise securities", "smallcase", "coin by", "5paisa", "sharekhan", "motilal", "icici securities",
+            "hdfc securities", "kotak securities", "axis securities", "sbicap", "sbi securities", "broking", "securities",
+            "demat", "nps ", "nps trust", "ppf", "digital gold", "safegold", "augmont", "sovereign gold", "sgb ",
+            "investment", "invest"
         ),
         "Salary" to listOf("salary", "sal ", "sal cr", "salcr", "payroll", "wages", "stipend", "salary credit", "sal for"),
-        "Refund" to listOf("refund", "reversal", "reversed", "cashback", "chargeback", "cash back", "rev "),
-        "Interest" to listOf("interest", "int pd", "int.pd", "int. pd", "int cr", "int.cr", "int credit", "dividend", "sb int")
+        "Refund" to listOf("refund", "reversal", "reversed", "cashback", "chargeback", "cash back", "rev ")
     )
 
     /** Long keywords that are too vague to match inside joined-up names. */
@@ -308,7 +320,9 @@ object CategoryGuesser {
             "pvt", "ltd", "limited", "llp", "store", "stores", "mart", "shop", "enterprise", "enterprises", "traders",
             "services", "solutions", "technologies", "tech", "india", "company", "corp", "agency", "centre", "center",
             "hotel", "cafe", "restaurant", "medical", "hospital", "bank", "finance", "payments", "retail", "brothers",
-            "and", "sons", "industries", "foods", "collection", "point", "bazar", "bazaar", "online", "digital"
+            "and", "sons", "industries", "foods", "collection", "point", "bazar", "bazaar", "online", "digital",
+            "corporation", "clearing", "securities", "broking", "capital", "fund", "funds", "amc", "asset", "management",
+            "investments", "wealth", "insurance", "life", "trust", "exchange", "financial", "fintech", "ventures", "global"
         )
         val lower = words.map { it.lowercase() }
         if (lower.any { it in business }) return false

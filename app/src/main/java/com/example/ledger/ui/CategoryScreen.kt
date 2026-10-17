@@ -24,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,6 +60,8 @@ fun CategoryScreen(
     items: List<LedgerTransaction>,
     categories: List<Category>,
     accountNames: Map<Long, String>,
+    counted: Boolean,
+    onCountedChange: (Boolean) -> Unit,
     onMove: (List<LedgerTransaction>, Long, Boolean) -> Unit,
     onOpen: (LedgerTransaction) -> Unit,
     onDismiss: () -> Unit
@@ -88,6 +91,25 @@ fun CategoryScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+                if (category != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Count in totals", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (counted) (if (kind == EntryKind.INCOME) "Counted as income" else "Counted as spending")
+                                else "Left out: treated as your own money moving",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = counted, onCheckedChange = onCountedChange)
                     }
                 }
                 OutlinedTextField(

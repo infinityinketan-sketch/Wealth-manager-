@@ -61,6 +61,9 @@ import com.example.ledger.core.Buckets
 import com.example.ledger.core.DateRange
 import com.example.ledger.core.Money
 import com.example.ledger.core.PeriodPreset
+import com.example.ledger.core.TotalsCalc
+import com.example.ledger.core.TotalsItem
+import androidx.compose.foundation.verticalScroll
 import com.example.ledger.data.Account
 import com.example.ledger.data.AccountBalance
 import com.example.ledger.data.AccountType
@@ -81,6 +84,7 @@ private enum class ChartKind(val label: String) { CATEGORIES("Categories"), OVER
 fun HomeScreen(
     period: DateRange,
     preset: PeriodPreset,
+    countChoices: Map<Long, Boolean>,
     toSortCount: Int,
     toSortTotal: Long,
     onSort: () -> Unit,
@@ -117,18 +121,24 @@ fun HomeScreen(
 
     val accountById = remember(accounts) { accounts.associateBy { it.id } }
     val categoryById = remember(categories) { categories.associateBy { it.id } }
-    val excludedIds = remember(categories) {
-        categories.filter { it.name in StarterCategories.excludedNames }.mapTo(HashSet<Long?>()) { it.id }
-    }
+    val excludedIds = remember(categories, countChoices) { excludedCategoryIds(categories, countChoices) }
+    var showTotalsInfo by remember { mutableStateOf(false) }
     val shown = remember(transactions, selectedAccountId) {
         if (selectedAccountId == null) transactions else transactions.filter { it.accountId == selectedAccountId }
     }
     val counted = remember(shown, excludedIds) { shown.filter { it.categoryId !in excludedIds } }
     val expenses = remember(counted) { counted.filter { it.kind == EntryKind.EXPENSE } }
-    val incomes = remember(counted) { counted.filter { it.kind == EntryKind.INCOME } }
-    val income = incomes.sumOf { it.amountPaise }
-    val expense = expenses.sumOf { it.amountPaise }
-    val moved = shown.filter { it.categoryId in excludedIds && it.kind == EntryKind.EXPENSE }.sumOf { it.amountPaise }
+    val refundIds = remember(categories) { categories.filter { it.name == TotalsCalc.REFUND }.map { it.id }.toSet() }
+    // Refunds give back money already spent: they reduce spending and are not income.
+    val incomes = remember(counted) { counted.filter { it.kind == EntryKind.INCOME && it.categoryId !in refundIds } }
+    val totals = remember(shown, excludedIds, categoryById) {
+        TotalsCalc.of(shown.map { t ->
+            TotalsItem(t.kind == EntryKind.INCOME, t.amountPaise, t.categoryId?.let { categoryById[it]?.name }, t.categoryId !in excludedIds)
+        })
+    }
+    val income = totals.income
+    val expense = totals.spent
+    val moved = totals.movedOut
     val spentByCategory = remember(expenses) {
         expenses.groupBy { it.categoryId }.mapValues { e -> e.value.sumOf { it.amountPaise } }
             .toList().sortedByDescending { it.second }
@@ -231,7 +241,16 @@ fun HomeScreen(
                     .padding(20.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("You spent", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("You spent", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
+                        Text(
+                            "How is this worked out? ⓘ",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { showTotalsInfo = true }
+                                .background(Color.White.copy(alpha = 0.16f)).padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
                     Text(
                         Money.formatInr(expense),
                         style = MaterialTheme.typography.displaySmall,
@@ -248,11 +267,18 @@ fun HomeScreen(
                         HeroTile(Icons.Filled.ArrowDownward, "Income", Money.formatInr(income / 100 * 100), Modifier.weight(1f))
                         HeroTile(Icons.Filled.Savings, "Saved", Money.formatInr((income - expense) / 100 * 100), Modifier.weight(1f))
                     }
-                    if (moved > 0) {
+                    if (totals.invested > 0) {
                         Text(
-                            "Not counted as spending: " + Money.formatInr(moved) + " (FD, investments, card bills, own transfers)",
+                            "Invested / FD: " + Money.formatInr(totals.invested) + " (part of your saving, not spending)",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f)
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+                    if (income == 0L && !today.isAfter(period.endInclusive)) {
+                        Text(
+                            "No income in this period yet. If salary comes at month end, set your month start day under More.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.9f)
                         )
                     }
                     if (overallBudget != null && selectedAccountId == null) {
@@ -389,7 +415,7 @@ fun HomeScreen(
                         modifier = Modifier.padding(vertical = 24.dp)
                     )
                 } else when (chart) {
-                    ChartKind.CATEGORIES -> DonutChart(slices, expense, onSliceClick = { sl -> onOpenCategory(sl.category?.id, EntryKind.EXPENSE, selectedAccountId) })
+                    ChartKind.CATEGORIES -> DonutChart(slices, totals.spentGross, onSliceClick = { sl -> onOpenCategory(sl.category?.id, EntryKind.EXPENSE, selectedAccountId) })
                     ChartKind.OVER_TIME -> BarChart(buckets.map { it.label }, bucketExpense, bucketIncome)
                     ChartKind.TREND -> TrendChart(buckets.map { it.label }, bucketExpense, bucketIncome)
                     ChartKind.MERCHANTS -> TopMerchants(merchants)
@@ -462,7 +488,7 @@ fun HomeScreen(
                     spentByCategory.forEach { (id, value) ->
                         val c = id?.let { categoryById[it] }
                         val limit = if (monthly) id?.let { budgetByCategory[it]?.limitPaise } else null
-                        CategoryRow(c, value, maxCat, limit, if (expense > 0) value * 100 / expense else 0L) {
+                        CategoryRow(c, value, maxCat, limit, if (totals.spentGross > 0) value * 100 / totals.spentGross else 0L) {
                             onOpenCategory(id, EntryKind.EXPENSE, selectedAccountId)
                         }
                     }
@@ -485,6 +511,31 @@ fun HomeScreen(
                             onOpenCategory(id, EntryKind.INCOME, selectedAccountId)
                         }
                     }
+                }
+            }
+        }
+
+        // ---- money moved, not counted ----
+        val notCounted = shown.filter { it.categoryId in excludedIds }
+            .groupBy { it.categoryId to it.kind }
+            .map { (k, l) -> Triple(k.first, k.second, l.sumOf { it.amountPaise }) }
+            .sortedByDescending { it.third }
+        if (notCounted.isNotEmpty()) {
+            item { SectionTitle("Not counted in totals") }
+            item {
+                SoftCard {
+                    val maxMoved = notCounted.first().third
+                    notCounted.forEach { (id, kind, value) ->
+                        val c = id?.let { categoryById[it] }
+                        CategoryRow(c, value, maxMoved, null, 0L, ofWhat = if (kind == EntryKind.INCOME) "money in" else "money out") {
+                            onOpenCategory(id, kind, selectedAccountId)
+                        }
+                    }
+                    Text(
+                        "Your own money moving (FD, investments, card bills, transfers). Open one to check it or to count it.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -526,6 +577,17 @@ fun HomeScreen(
                 )
             }
         }
+    }
+
+    if (showTotalsInfo) {
+        TotalsInfoDialog(
+            totals = totals,
+            incomeRows = incomeByCategory.map { (id, v) -> (id?.let { categoryById[it]?.name } ?: "Uncategorised") to v },
+            movedOutRows = shown.filter { it.kind == EntryKind.EXPENSE && it.categoryId in excludedIds }
+                .groupBy { it.categoryId?.let { id -> categoryById[id]?.name } ?: "Other" }
+                .map { (n, l) -> n to l.sumOf { it.amountPaise } },
+            onDismiss = { showTotalsInfo = false }
+        )
     }
 
     if (showRangePicker) {
@@ -649,7 +711,7 @@ private fun CategoryRow(
                         .background(if (over) MaterialTheme.colorScheme.error else color)
                 )
             }
-            Text("$percent% of $ofWhat  ›", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (ofWhat.startsWith("money")) "Not counted · $ofWhat  ›" else "$percent% of $ofWhat  ›", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -737,4 +799,61 @@ private fun RangePickerDialog(initial: DateRange, onPick: (LocalDate, LocalDate)
             modifier = Modifier.weight(1f)
         )
     }
+}
+
+@Composable
+private fun TotalsInfoDialog(
+    totals: com.example.ledger.core.Totals,
+    incomeRows: List<Pair<String, Long>>,
+    movedOutRows: List<Pair<String, Long>>,
+    onDismiss: () -> Unit
+) {
+    @Composable
+    fun line(label: String, value: String, bold: Boolean = false, color: Color = MaterialTheme.colorScheme.onSurface) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text(label, modifier = Modifier.weight(1f), fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
+            Text(value, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal, color = color)
+        }
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("How this is worked out") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                line("Income", Money.formatInr(totals.income), bold = true, color = WealthColors.income)
+                incomeRows.forEach { (n, v) -> line("   $n", Money.formatInr(v)) }
+                Text(" ")
+                line("Spending", Money.formatInr(totals.spentGross), bold = true)
+                if (totals.refunds > 0) line("   minus refunds", "−" + Money.formatInr(totals.refunds))
+                line("You spent", Money.formatInr(totals.spent), bold = true, color = WealthColors.expense)
+                Text(" ")
+                line("Saved = income − spent", Money.formatInr(totals.saved), bold = true)
+                if (totals.invested > 0) {
+                    Text(
+                        "Of this, " + Money.formatInr(totals.invested) + " went into investments / FD.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(" ")
+                Text("Not counted (your own money moving)", fontWeight = FontWeight.SemiBold)
+                if (movedOutRows.isEmpty() && totals.movedIn == 0L) {
+                    Text("Nothing in this period.", style = MaterialTheme.typography.bodySmall)
+                }
+                movedOutRows.forEach { (n, v) -> line("   Out: $n", Money.formatInr(v)) }
+                if (totals.movedIn > 0) line("   In: from investments / own accounts", Money.formatInr(totals.movedIn))
+                Text(" ")
+                Text(
+                    "Something counted wrongly? Tap the category on the home screen to move entries, or turn " +
+                        "\"Count in totals\" off for a whole category.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } }
+    )
 }

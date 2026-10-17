@@ -106,3 +106,13 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - Bank balances: last SMS balance plus every entry after it ("Bank SMS 16 Sep + 12 later").
 - Duplicate alerts are only identical texts or a second sender id; two real same-amount payments are both kept.
 - Quick self-transfer pairs start at ₹500 (was ₹100).
+
+## v0.9.0: correct income and savings
+
+- Money back from investments (MF redemptions via ICCL / BSE / CAMS / KFin, broker payouts from Zerodha,
+  Groww, Upstox…, FD/RD maturity, own transfers, loan disbursal) is "Transfer in (not income)".
+  Clearing corporations, AMCs and brokers are never taken for people.
+- Refunds reduce spending instead of counting as income (`core/Totals.kt`).
+- Saved = income − spent; the summary says how much of it went into investments / FD.
+- "How is this worked out?" on the summary shows the full breakdown.
+- Every category has a "Count in totals" switch; a "Not counted in totals" section lists what is left out.

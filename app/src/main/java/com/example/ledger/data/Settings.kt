@@ -34,7 +34,17 @@ class Settings(context: Context) {
         get() = prefs.getStringSet(KEY_DECLINED, emptySet())?.toSet() ?: emptySet()
         set(value) = prefs.edit().putStringSet(KEY_DECLINED, value).apply()
 
+    /** The person's choice per category: true = count in income/spending totals, false = leave out. */
+    var countChoices: Map<Long, Boolean>
+        get() = (prefs.getStringSet(KEY_COUNT, emptySet()) ?: emptySet()).mapNotNull { e ->
+            val parts = e.split(":")
+            val id = parts.getOrNull(0)?.toLongOrNull() ?: return@mapNotNull null
+            id to (parts.getOrNull(1) == "1")
+        }.toMap()
+        set(value) = prefs.edit().putStringSet(KEY_COUNT, value.map { (id, on) -> id.toString() + ":" + (if (on) "1" else "0") }.toSet()).apply()
+
     private companion object {
+        const val KEY_COUNT = "count_choices"
         const val KEY_DECLINED = "declined_reminders"
         const val KEY_PARSER_VERSION = "sms_parser_version"
         const val KEY_SMS_PROMPT = "sms_prompt_done"

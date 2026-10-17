@@ -289,4 +289,14 @@ class SmsParserTest {
         // Two real ₹20 teas from the same bank sender, different messages: two payments.
         assertFalse(SmsDuplicates.isRepeat("VM-ICICIB-S|1000|555", "VM-ICICIB-S|1090|666"))
     }
+
+    @Test fun investmentMoneyBackIsNotIncome() {
+        assertEquals(CategoryGuesser.TRANSFER_IN, CategoryGuesser.guess(true, "INDIAN CLEARING CORPORATION", ""))
+        assertEquals(CategoryGuesser.TRANSFER_IN, CategoryGuesser.guess(true, "ZERODHA BROKING", ""))
+        assertEquals(CategoryGuesser.TRANSFER_IN, CategoryGuesser.guess(true, "NEXTBILLION TECHNOLOGY", ""))
+        assertEquals(CategoryGuesser.TRANSFER_IN, CategoryGuesser.guess(true, null, "credited by ICCL MF redemption"))
+        assertEquals(CategoryGuesser.TRANSFER_IN, CategoryGuesser.guess(true, null, "credited towards FD maturity incl interest"))
+        assertEquals("Interest", CategoryGuesser.guess(true, null, "Int.Pd for the quarter"))
+        assertFalse(CategoryGuesser.looksLikePerson("INDIAN CLEARING CORPORATION"))
+    }
 }

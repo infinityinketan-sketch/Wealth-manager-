@@ -47,6 +47,7 @@ import com.example.ledger.ui.LedgerTheme
 import com.example.ledger.ui.LedgerViewModel
 import com.example.ledger.ui.MoreScreen
 import com.example.ledger.ui.CategoryScreen
+import com.example.ledger.ui.excludedCategoryIds
 import com.example.ledger.ui.formatDate
 import com.example.ledger.ui.formatShortDate
 import com.example.ledger.ui.SortScreen
@@ -240,6 +241,7 @@ private fun LedgerRoot(
     var openCategory by remember { mutableStateOf<Triple<Long?, EntryKind, Long?>?>(null) }
     val ruleKeys by viewModel.ruleKeys.collectAsStateWithLifecycle()
     val dues by viewModel.dues.collectAsStateWithLifecycle()
+    val countChoices by viewModel.countChoices.collectAsStateWithLifecycle()
     val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
     var showAddReminder by remember { mutableStateOf(false) }
     val period by viewModel.period.collectAsStateWithLifecycle()
@@ -306,6 +308,7 @@ private fun LedgerRoot(
                 onEnableSms = onEnableSms,
                 onScanAgain = viewModel::scanSms,
                 preset = periodChoice.preset,
+                countChoices = countChoices,
                 toSortCount = toSort.sumOf { it.items.size },
                 toSortTotal = toSort.sumOf { it.total },
                 onSort = { showSort = true },
@@ -373,6 +376,8 @@ private fun LedgerRoot(
             items = items,
             categories = categories,
             accountNames = accounts.associate { it.id to it.name },
+            counted = catId == null || catId !in excludedCategoryIds(categories, countChoices),
+            onCountedChange = { on -> catId?.let { viewModel.setCounted(it, on) } },
             onMove = viewModel::recategorize,
             onOpen = {
                 editing = it

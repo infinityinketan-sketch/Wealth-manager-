@@ -88,3 +88,13 @@ fun CategoryBadge(category: Category?, size: Dp = 40.dp) {
         Icon(categoryIcon(category?.name), contentDescription = null, tint = color, modifier = Modifier.size(size * 0.55f))
     }
 }
+
+/**
+ * Categories left out of income / spending totals: the money-movement ones (FD, card bills, own
+ * transfers) unless the person switched them on, plus any the person switched off.
+ */
+fun excludedCategoryIds(categories: List<Category>, choices: Map<Long, Boolean>): Set<Long?> =
+    categories.filter { c ->
+        val byDefault = c.name in com.example.ledger.sms.StarterCategories.excludedNames
+        !(choices[c.id] ?: !byDefault)
+    }.mapTo(HashSet<Long?>()) { it.id }
