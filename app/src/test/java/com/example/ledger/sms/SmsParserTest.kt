@@ -214,4 +214,55 @@ class SmsParserTest {
         assertNull(SmsParser.bankFromSender("VM-JUSPAY"))
         assertNull(SmsParser.bankFromSender("VM-MSEDCL"))
     }
+
+    @Test fun creditWithLoanAdFooterStaysIncome() {
+        val p = parse(
+            "VM-ICICIB-S",
+            "Dear Customer, Acct XX374 is credited with Rs 5,000.00 on 15-Oct-26 from RAHUL PATIL. UPI:6288. Get instant personal loan at 10.5%*"
+        )
+        assertTrue(p.isIncome)
+        assertEquals(SmsAccountKind.BANK, p.accountKind)
+        assertEquals("Received from people", CategoryGuesser.guess(true, p.merchant, ""))
+    }
+
+    @Test fun medicalWordsMeanHealth() {
+        for (m in listOf("SAI MEDICAL", "SHREE CHEMIST", "SAIMEDICALS", "OM MEDICOS", "CITYHOSPITAL", "APOLLO PHARMACY",
+            "DR LAL PATHLABS", "VISION OPTICALS", "DHANVANTARI AUSHADHALAYA", "SMILE DENTAL CLINIC")) {
+            assertEquals(m + " -> Health", m + " -> " + CategoryGuesser.guess(false, m, ""))
+        }
+    }
+
+    @Test fun everydayIndianShops() {
+        assertEquals("Groceries", CategoryGuesser.guess(false, "BALAJI KIRANA STORES", ""))
+        assertEquals("Groceries", CategoryGuesser.guess(false, "GOKUL DAIRY", ""))
+        assertEquals("Food & dining", CategoryGuesser.guess(false, "AMRUTTULYA", ""))
+        assertEquals("Food & dining", CategoryGuesser.guess(false, "OM SWEETS", ""))
+        assertEquals("Food & dining", CategoryGuesser.guess(false, "HOTEL SAI PALACE", ""))
+        assertEquals("Food & dining", CategoryGuesser.guess(false, "SKYLINE HOSPITALITY", ""))
+        assertEquals("Fuel", CategoryGuesser.guess(false, "SHIVAMPETROLPUMP", ""))
+        assertEquals("Personal care", CategoryGuesser.guess(false, "STYLE UNISEX SALON", ""))
+        assertEquals("Home & household", CategoryGuesser.guess(false, "SHREE HARDWARE", ""))
+        assertEquals("Donations", CategoryGuesser.guess(false, "DAGDUSHETH HALWAI GANPATI TRUST", ""))
+        assertEquals("Education", CategoryGuesser.guess(false, "BRIGHT FUTURE CLASSES", ""))
+        assertEquals("Health", CategoryGuesser.guess(false, "SHIRDI SAI MEDICAL", ""))
+        assertEquals("Groceries", CategoryGuesser.guess(false, "TIRUPATI KIRANA", ""))
+        assertEquals("Transport", CategoryGuesser.guess(false, "NEXA SERVICE", ""))
+        assertEquals("Electricity & bills", CategoryGuesser.guess(false, "MAHAVITARAN", ""))
+        assertEquals("Clothes", CategoryGuesser.guess(false, "ZUDIO", ""))
+    }
+
+    @Test fun bankCodesInBodyAreNotCategories() {
+        assertNull(CategoryGuesser.guess(false, null, "INR 250.00 debited A/c no. XX1234 UPI/DR/628812345678 Not you? Report online"))
+    }
+
+    @Test fun learnsWordsFromCorrections() {
+        val learned = CategoryGuesser.learnWords(
+            listOf("PATIL AGRO" to "Groceries", "SHREE AGRO" to "Groceries", "GURU XEROX" to "Education", "SHREE MOTORS" to "Transport")
+        )
+        assertEquals("Groceries", learned["agro"])
+        assertNull(learned["shree"]) // generic shop word, never learned
+        assertEquals("Groceries", CategoryGuesser.guess(false, "JADHAV AGRO", "", learned))
+        val ambiguous = CategoryGuesser.learnWords(listOf("NEEL TOUCH" to "Health", "AURA TOUCH" to "Personal care"))
+        assertNull(ambiguous["touch"])
+    }
 }

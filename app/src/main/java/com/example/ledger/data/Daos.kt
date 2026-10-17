@@ -17,6 +17,10 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIgnore(transaction: LedgerTransaction): Long
 
+    /** SMS entries the app was unsure about (no category or a catch-all one); re-guessed when it learns. */
+    @Query("SELECT * FROM transactions WHERE smsKey IS NOT NULL AND merchant IS NOT NULL AND (categoryId IS NULL OR categoryId IN (:ids))")
+    suspend fun uncertain(ids: List<Long>): List<LedgerTransaction>
+
     @Query("SELECT COUNT(*) FROM transactions WHERE smsKey IS NOT NULL")
     suspend fun countSms(): Int
 
@@ -135,6 +139,12 @@ interface MerchantRuleDao {
 
     @Query("SELECT * FROM merchant_rules")
     suspend fun all(): List<MerchantRule>
+
+    @Query(
+        "SELECT DISTINCT t.merchant AS merchant, r.categoryId AS categoryId, r.kind AS kind FROM merchant_rules r " +
+            "JOIN transactions t ON t.merchantKey = r.merchantKey WHERE t.merchant IS NOT NULL"
+    )
+    suspend fun examples(): List<MerchantExample>
 }
 
 @Dao

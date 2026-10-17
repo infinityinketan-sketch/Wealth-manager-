@@ -88,14 +88,23 @@ class LedgerRepository(private val db: LedgerDatabase) {
     class ImportContext internal constructor(
         internal val accountIds: MutableMap<String, Long>,
         internal val categoryByName: Map<Pair<String, EntryKind>, Long>,
-        internal val rules: Map<Pair<String, EntryKind>, Long>
+        internal val rules: Map<Pair<String, EntryKind>, Long>,
+        /** Words learned from the person's own choices, e.g. "medical" -> "Health", per income / expense. */
+        internal val learned: Map<EntryKind, Map<String, String>>
     )
 
     suspend fun newImportContext(): ImportContext {
         ensureStarterCategories()
         val cats = categories.all().associate { (it.name to it.kind) to it.id }
         val rules = merchantRules.all().associate { (it.merchantKey to it.kind) to it.categoryId }
-        return ImportContext(mutableMapOf(), cats, rules)
+        val nameById = categories.all().associate { it.id to it.name }
+        val examples = merchantRules.examples()
+        val learned = EntryKind.values().associateWith { kind ->
+            CategoryGuesser.learnWords(
+                examples.filter { it.kind == kind }.mapNotNull { e -> nameById[e.categoryId]?.let { e.merchant to it } }
+            )
+        }
+        return ImportContext(mutableMapOf(), cats, rules, learned)
     }
 
     private val minute = 60_000L
@@ -158,7 +167,7 @@ class LedgerRepository(private val db: LedgerDatabase) {
     }
 
     private suspend fun newAccount(parsed: ParsedSms, key: String): Long {
-        val suffix = parsed.accountDigits?.let { " ••$it" } ?: ""
+        val suffix = parsed.accountDigits?.let { " ••" + it.takeLast(4) } ?: ""
         val name = when (parsed.accountKind) {
             SmsAccountKind.BANK -> parsed.bankName + suffix
             SmsAccountKind.CARD -> parsed.bankName + " card" + suffix
@@ -202,7 +211,8 @@ class LedgerRepository(private val db: LedgerDatabase) {
         val merchantKey = CategoryGuesser.merchantKey(parsed.merchant)
         val categoryId = merchantKey?.let { ctx.rules[it to kind] }
             ?: parsed.categoryHint?.let { ctx.categoryByName[it to kind] }
-            ?: CategoryGuesser.guess(parsed.isIncome, parsed.merchant, bodyForGuess)?.let { ctx.categoryByName[it to kind] }
+            ?: CategoryGuesser.guess(parsed.isIncome, parsed.merchant, bodyForGuess, ctx.learned[kind] ?: emptyMap())
+                ?.let { ctx.categoryByName[it to kind] }
             ?: ctx.categoryByName[(if (parsed.isIncome) "Other income" else "Other") to kind]
 
         val epochDay = java.time.Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().toEpochDay()
@@ -250,6 +260,24 @@ class LedgerRepository(private val db: LedgerDatabase) {
         db.withTransaction {
             merchantRules.upsert(MerchantRule(merchantKey, categoryId, kind))
             transactions.setCategoryForMerchant(merchantKey, kind, categoryId)
+        }
+        reguessUncertain()
+    }
+
+    /**
+     * Entries the app was unsure about get another look with everything learned so far: a choice of
+     * Health for "SAI MEDICAL" also moves "OM MEDICAL" from Other to Health.
+     */
+    suspend fun reguessUncertain() {
+        val ctx = newImportContext()
+        val fallbackIds = ctx.categoryByName.filterKeys { it.first in StarterCategories.fallbackNames }.values.toList()
+        for (t in transactions.uncertain(fallbackIds)) {
+            val merchant = t.merchant ?: continue
+            val newId = t.merchantKey?.let { ctx.rules[it to t.kind] }
+                ?: CategoryGuesser.guess(t.kind == EntryKind.INCOME, merchant, "", ctx.learned[t.kind] ?: emptyMap())
+                    ?.let { ctx.categoryByName[it to t.kind] }
+                ?: continue
+            if (newId != t.categoryId) transactions.update(t.copy(categoryId = newId))
         }
     }
 

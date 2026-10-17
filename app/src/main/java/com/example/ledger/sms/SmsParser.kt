@@ -29,7 +29,7 @@ data class ParsedSms(
 object SmsParser {
 
     /** Bump when the reading rules change: the app then re-reads old messages with the new rules. */
-    const val VERSION = 3
+    const val VERSION = 4
 
     private val amountRegex = Regex("""(?i)(?:rs\.?|inr|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""")
 
@@ -136,7 +136,11 @@ object SmsParser {
 
         val amount = transactionAmount(text, lower) ?: return null
 
-        val mentionsLoan = Regex("""\bloan\b""").containsMatchIn(lower) || lower.contains("emi ")
+        // Only a message about the person's own loan account counts, not an ad footer like "Get an instant loan".
+        val loanAccountPhrase = Regex("""\bloan\s*(?:a/c|acct|account|ac\b|no\.?|number)|towards\s+(?:your\s+|the\s+)?(?:loan|emi)\b""")
+            .containsMatchIn(lower)
+        val mentionsLoan = loanAccountPhrase ||
+            (lenderFromSender(sender) != null && (Regex("""\bloan\b""").containsMatchIn(lower) || lower.contains("emi ")))
         val isReceipt = receiptWords.any { lower.contains(it) }
         val balance = balanceRegex.find(text)?.groupValues?.get(1)?.let { toPaise(it) }
         val isDisbursal = lower.contains("disburs")

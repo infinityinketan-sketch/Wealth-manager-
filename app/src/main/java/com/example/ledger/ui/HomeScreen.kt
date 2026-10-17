@@ -192,7 +192,8 @@ fun HomeScreen(
                     Text(
                         if (lastImported > 0) "Found $lastImported new transactions in your messages" else "Messages are up to date",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f).padding(end = 12.dp)
                     )
                     OutlinedButton(onClick = onScanAgain) { Text("Rescan") }
                 }

@@ -57,3 +57,13 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
   debit for the same EMI is also there.
 - When the reading rules change (`SmsParser.VERSION`), SMS transactions are rebuilt from the inbox automatically;
   manual entries and learned "every time" merchant choices are kept.
+
+## v0.4.0: smarter categories
+
+- Much larger Indian merchant dictionary (medical/chemist/aushadhalaya -> Health, kirana/dairy -> Groceries,
+  sweets/amruttulya -> Food, petrol pump, salon, hardware, classes, temple trusts ...), matched on word starts and,
+  for merchant names, inside joined-up names like "SAIMEDICALS".
+- New categories: Home & household, Personal care, Donations.
+- Learns words from the person's own "every time" choices (e.g. "AGRO" -> Groceries) and re-tags uncertain entries.
+- The edit screen shows the original bank message.
+- Fixed: a credit whose footer advertised a loan was treated as an EMI payment (income showed ₹0).

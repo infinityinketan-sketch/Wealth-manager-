@@ -18,7 +18,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
+import com.example.ledger.sms.SmsImporter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +75,11 @@ fun TransactionEditor(
     val categoryIndex = (kindCategories.indexOfFirst { it.id == categoryId } + 1).coerceAtLeast(0)
     var repeatIndex by remember(existing) { mutableStateOf(0) }
     var showDatePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val smsBody by produceState<String?>(initialValue = null, existing?.smsKey) {
+        val key = existing?.smsKey
+        value = if (key == null) null else withContext(Dispatchers.IO) { SmsImporter.findBody(context, key) }
+    }
     var error by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -85,6 +96,12 @@ fun TransactionEditor(
                             (if (existing.smsKey != null) "  ·  read from SMS" else ""),
                         style = MaterialTheme.typography.bodyMedium
                     )
+                }
+                smsBody?.let { body ->
+                    Text("Bank message (long-press to copy)", style = MaterialTheme.typography.labelMedium)
+                    SelectionContainer {
+                        Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     EntryKind.values().forEach { option ->

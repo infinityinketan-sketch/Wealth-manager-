@@ -70,6 +70,9 @@ data class MerchantRule(
     val kind: EntryKind
 )
 
+/** A merchant the person categorised themselves, used to learn words like "medical" -> Health. */
+data class MerchantExample(val merchant: String, val categoryId: Long, val kind: EntryKind)
+
 /** Monthly limit for one expense category. [categoryId] == [OVERALL_ID] is the overall monthly budget. */
 @Entity(tableName = "budgets")
 data class Budget(
