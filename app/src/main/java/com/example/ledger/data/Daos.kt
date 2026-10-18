@@ -34,6 +34,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE kind = 'EXPENSE' AND merchantKey IS NOT NULL AND epochDay >= :fromDay")
     suspend fun merchantExpensesSince(fromDay: Long): List<LedgerTransaction>
 
+    @Query("UPDATE transactions SET categoryId = :toId WHERE categoryId = :fromId")
+    suspend fun moveCategory(fromId: Long, toId: Long)
+
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE id IN (:ids)")
     suspend fun setCategory(ids: List<Long>, categoryId: Long)
 
@@ -152,6 +155,9 @@ interface CategoryDao {
 
 @Dao
 interface MerchantRuleDao {
+    @Query("UPDATE merchant_rules SET categoryId = :toId WHERE categoryId = :fromId")
+    suspend fun moveCategory(fromId: Long, toId: Long)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(rule: MerchantRule)
 
@@ -172,6 +178,9 @@ interface MerchantRuleDao {
 interface BudgetDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(budget: Budget)
+
+    @Query("UPDATE OR REPLACE budgets SET categoryId = :toId WHERE categoryId = :fromId")
+    suspend fun moveCategory(fromId: Long, toId: Long)
 
     @Query("DELETE FROM budgets WHERE categoryId = :categoryId")
     suspend fun delete(categoryId: Long)
@@ -226,6 +235,9 @@ interface OverrideDao {
 
     @Query("SELECT * FROM overrides")
     suspend fun all(): List<EntryOverride>
+
+    @Query("UPDATE overrides SET categoryId = :toId WHERE categoryId = :fromId")
+    suspend fun moveCategory(fromId: Long, toId: Long)
 
     /** A newer "every time" choice for a merchant replaces earlier one-off fixes for it. */
     @Query("DELETE FROM overrides WHERE smsKey IN (SELECT smsKey FROM transactions WHERE merchantKey = :merchantKey AND kind = :kind)")

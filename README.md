@@ -130,3 +130,11 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 
 - The first screen, a home card (until "Got it") and a "Why are some payments missing?" link explain that small UPI
   payments (some banks send no SMS), UPI Lite, cash and wallets are not in bank SMS, and how to add them.
+
+## v0.9.3: stability
+
+- Background errors no longer close the app: they show a short message and are saved (`data/CrashLog.kt`).
+- A crash is recorded on the phone and offered on the next start (and under More › Problem report) with "Copy details".
+- Bulk category moves are split into chunks (older SQLite allows 999 values per query).
+- Starter categories are added under a lock; duplicates created by earlier versions are merged.
+- SMS import and re-guessing write in batches, so screens refresh a few times instead of once per entry.

@@ -77,6 +77,7 @@ fun MoreScreen(
     onSetBudget: (Long, Long) -> Unit,
     onToggleRecurring: (RecurringRule, Boolean) -> Unit,
     onDeleteRecurring: (RecurringRule) -> Unit,
+    onProblemReport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var dialog by remember { mutableStateOf<MoreDialog?>(null) }
@@ -92,6 +93,9 @@ fun MoreScreen(
     ) {
         // ---- Settings ----
         item { SectionTitle("Settings") }
+        item {
+            TextButton(onClick = onProblemReport) { Text("Problem report (copy crash details)") }
+        }
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

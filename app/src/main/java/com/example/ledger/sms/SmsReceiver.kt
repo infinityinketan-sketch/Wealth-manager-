@@ -30,6 +30,8 @@ class SmsReceiver : BroadcastReceiver() {
                     repo.recordSms(repo.newImportContext(), parsed, SmsImporter.smsKey(sender, millis, body), millis, body)
                 }
                 repo.afterImport()
+            } catch (e: Throwable) {
+                com.example.ledger.data.CrashLog.save(context, e, fatal = false)
             } finally {
                 pending.finish()
             }

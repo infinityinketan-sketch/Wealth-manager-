@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.ledger"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "0.9.2"
+        versionCode = 13
+        versionName = "0.9.3"
     }
 
     buildTypes {

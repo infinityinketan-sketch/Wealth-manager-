@@ -17,9 +17,12 @@ import com.example.ledger.data.EntryKind
 import com.example.ledger.data.LedgerTransaction
 import com.example.ledger.data.RecurringRule
 import com.example.ledger.data.Due
+import com.example.ledger.data.CrashLog
 import com.example.ledger.core.RepeatingPayment
 import com.example.ledger.sms.SmsImporter
 import com.example.ledger.sms.SmsParser
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,6 +39,22 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     private val app = application as LedgerApp
     private val repo = app.repository
     private val settings = app.settings
+
+    /** A short message for the screen when something failed in the background (instead of closing the app). */
+    private val errorState = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = errorState
+
+    fun clearError() {
+        errorState.value = null
+    }
+
+    private val errorHandler = CoroutineExceptionHandler { _, e ->
+        CrashLog.save(app, e, fatal = false)
+        if (scanState.value is ScanState.Running) scanState.value = ScanState.Idle
+        errorState.value = "Something went wrong (" + (e.javaClass.simpleName) + "). Details were saved; open More › Problem report to copy them."
+    }
+
+    private fun launchSafe(block: suspend CoroutineScope.() -> Unit) = viewModelScope.launch(errorHandler, block = block)
 
     private val startDayState = MutableStateFlow(settings.budgetStartDay)
     val startDay: StateFlow<Int> = startDayState
@@ -72,7 +91,7 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Sets the category of one entry only (for entries without a merchant name). */
     fun setCategory(transaction: LedgerTransaction, categoryId: Long) {
-        viewModelScope.launch { repo.saveTransaction(transaction.copy(categoryId = categoryId)) }
+        launchSafe { repo.saveTransaction(transaction.copy(categoryId = categoryId)) }
     }
 
     val recurring: StateFlow<List<RecurringRule>> =
@@ -106,7 +125,7 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     fun scanSms() {
         if (scanState.value is ScanState.Running) return
         scanState.value = ScanState.Running(0, 0)
-        viewModelScope.launch {
+        launchSafe {
             repo.ensureStarterCategories()
             // New reading rules: forget old SMS results and read the whole inbox again.
             // Learned "every time" merchant choices and manual entries are kept.
@@ -167,11 +186,11 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private fun refreshSuggestions() {
-        viewModelScope.launch { repeatingState.value = repo.findRepeating() }
+        launchSafe { repeatingState.value = repo.findRepeating() }
     }
 
     fun acceptSuggestion(p: RepeatingPayment) {
-        viewModelScope.launch { repo.addReminder(titleCase(p.name), p.amountPaise, p.nextDate, p.months, p.merchantKey) }
+        launchSafe { repo.addReminder(titleCase(p.name), p.amountPaise, p.nextDate, p.months, p.merchantKey) }
     }
 
     fun declineSuggestion(p: RepeatingPayment) {
@@ -180,29 +199,29 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun addReminder(title: String, amountPaise: Long, date: LocalDate, repeatMonths: Int?) {
-        viewModelScope.launch { repo.addReminder(title, amountPaise, date, repeatMonths) }
+        launchSafe { repo.addReminder(title, amountPaise, date, repeatMonths) }
     }
 
     fun closeDue(due: Due, paid: Boolean) {
-        viewModelScope.launch { repo.closeDue(due, paid) }
+        launchSafe { repo.closeDue(due, paid) }
     }
 
     private fun titleCase(s: String) = s.lowercase().split(" ").joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
 
     /** Saves the person's category choice for a merchant and applies it to all of that merchant's entries. */
     fun recategorize(items: List<LedgerTransaction>, categoryId: Long, remember: Boolean) {
-        viewModelScope.launch { repo.recategorize(items, categoryId, remember) }
+        launchSafe { repo.recategorize(items, categoryId, remember) }
     }
 
     fun learnMerchant(merchantKey: String, kind: EntryKind, categoryId: Long) {
-        viewModelScope.launch { repo.learnMerchant(merchantKey, kind, categoryId) }
+        launchSafe { repo.learnMerchant(merchantKey, kind, categoryId) }
     }
 
     init {
-        viewModelScope.launch { repo.ensureStarterCategories() }
+        launchSafe { repo.ensureStarterCategories() }
         refreshSuggestions()
         // Entries that came due while the app was closed show up immediately.
-        viewModelScope.launch { repo.generateDueRecurring(LocalDate.now()) }
+        launchSafe { repo.generateDueRecurring(LocalDate.now()) }
     }
 
     fun previousPeriod() {
@@ -228,11 +247,11 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun saveTransaction(transaction: LedgerTransaction) {
-        viewModelScope.launch { repo.saveTransaction(transaction) }
+        launchSafe { repo.saveTransaction(transaction) }
     }
 
     fun deleteTransaction(transaction: LedgerTransaction) {
-        viewModelScope.launch { repo.deleteTransaction(transaction) }
+        launchSafe { repo.deleteTransaction(transaction) }
     }
 
     /** A new entry that repeats: stored as a rule, and the first entry is created from it. */
@@ -246,34 +265,34 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
             frequency = frequency,
             startEpochDay = transaction.epochDay
         )
-        viewModelScope.launch { repo.addRecurring(rule, LocalDate.now()) }
+        launchSafe { repo.addRecurring(rule, LocalDate.now()) }
     }
 
     fun setRecurringActive(rule: RecurringRule, active: Boolean) {
-        viewModelScope.launch { repo.setRecurringActive(rule, active) }
+        launchSafe { repo.setRecurringActive(rule, active) }
     }
 
     fun deleteRecurring(rule: RecurringRule) {
-        viewModelScope.launch { repo.deleteRecurring(rule.id) }
+        launchSafe { repo.deleteRecurring(rule.id) }
     }
 
     fun addAccount(name: String, type: AccountType, openingBalancePaise: Long) {
-        viewModelScope.launch { repo.addAccount(name, type, openingBalancePaise) }
+        launchSafe { repo.addAccount(name, type, openingBalancePaise) }
     }
 
     fun addCategory(name: String, kind: EntryKind, colorArgb: Long) {
-        viewModelScope.launch { repo.addCategory(name, kind, colorArgb) }
+        launchSafe { repo.addCategory(name, kind, colorArgb) }
     }
 
     fun renameCategory(category: Category, newName: String) {
-        viewModelScope.launch { repo.renameCategory(category, newName) }
+        launchSafe { repo.renameCategory(category, newName) }
     }
 
     fun deleteCategory(category: Category) {
-        viewModelScope.launch { repo.deleteCategory(category) }
+        launchSafe { repo.deleteCategory(category) }
     }
 
     fun setBudget(categoryId: Long, limitPaise: Long) {
-        viewModelScope.launch { repo.setBudget(categoryId, limitPaise) }
+        launchSafe { repo.setBudget(categoryId, limitPaise) }
     }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.ledger.data.CrashLog
 import com.example.ledger.data.LedgerDatabase
 import com.example.ledger.data.LedgerRepository
 import com.example.ledger.data.Settings
@@ -18,6 +19,12 @@ class LedgerApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Remember why the app closed, so it can be shown (and copied) on the next start.
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
+            try { CrashLog.save(this, e, fatal = true) } catch (ignored: Throwable) { }
+            previous?.uncaughtException(thread, e)
+        }
         repository = LedgerRepository(LedgerDatabase.build(this))
         settings = Settings(this)
 

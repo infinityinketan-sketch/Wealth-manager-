@@ -77,12 +77,18 @@ object SmsImporter {
                     val iDate = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
                     val total = cursor.count
                     val zone = java.time.ZoneId.systemDefault()
+                    // Read the messages first, then store them 200 at a time (one database write each),
+                    // so the screens refresh a few times instead of thousands of times.
+                    val rows = ArrayList<Triple<String, String, Long>>(total)
                     while (cursor.moveToNext()) {
-                        scanned++
-                        if (scanned % 100 == 0 || scanned == total) onProgress(scanned, total)
                         val sender = cursor.getString(iAddress) ?: continue
                         val body = cursor.getString(iBody) ?: continue
-                        val millis = cursor.getLong(iDate)
+                        rows.add(Triple(sender, body, cursor.getLong(iDate)))
+                    }
+                    for (chunk in rows.chunked(200)) repo.batch {
+                    for ((sender, body, millis) in chunk) {
+                        scanned++
+                        if (scanned % 100 == 0 || scanned == rows.size) onProgress(scanned, rows.size)
                         val smsDate = java.time.Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
                         val due = DueParser.parse(sender, body, smsDate)
                         if (due != null) repo.recordDue(due, millis)
@@ -102,6 +108,7 @@ object SmsImporter {
                         }
                         found++
                         if (repo.recordSms(ctx, parsed, smsKey(sender, millis, body), millis, body)) imported++
+                    }
                     }
                 }
             } catch (e: SecurityException) {

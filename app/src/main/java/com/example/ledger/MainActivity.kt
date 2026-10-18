@@ -53,6 +53,7 @@ import com.example.ledger.ui.formatShortDate
 import com.example.ledger.ui.SortScreen
 import com.example.ledger.ui.AddReminderDialog
 import com.example.ledger.ui.UnreadScreen
+import com.example.ledger.ui.ProblemReportDialog
 import com.example.ledger.ui.sortGroups
 import com.example.ledger.ui.TransactionEditor
 
@@ -261,6 +262,17 @@ private fun LedgerRoot(
     val unread by viewModel.unread.collectAsStateWithLifecycle()
     val scanStats by viewModel.scanStats.collectAsStateWithLifecycle()
     var showUnread by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Details of a crash from last time are offered once, on the next start.
+    var problem by remember { mutableStateOf(com.example.ledger.data.CrashLog.read(context)) }
+    var showProblem by remember { mutableStateOf(problem != null) }
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(error) {
+        error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
     val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
     var showAddReminder by remember { mutableStateOf(false) }
     val period by viewModel.period.collectAsStateWithLifecycle()
@@ -367,6 +379,10 @@ private fun LedgerRoot(
                 onSetBudget = viewModel::setBudget,
                 onToggleRecurring = viewModel::setRecurringActive,
                 onDeleteRecurring = viewModel::deleteRecurring,
+                onProblemReport = {
+                    problem = com.example.ledger.data.CrashLog.read(context)
+                    showProblem = true
+                },
                 modifier = Modifier.padding(padding)
             )
         }
@@ -411,6 +427,17 @@ private fun LedgerRoot(
                 showEditor = true
             },
             onDismiss = { openCategory = null }
+        )
+    }
+
+    if (showProblem) {
+        ProblemReportDialog(
+            report = problem,
+            onClear = {
+                com.example.ledger.data.CrashLog.clear(context)
+                problem = null
+            },
+            onDismiss = { showProblem = false }
         )
     }
 

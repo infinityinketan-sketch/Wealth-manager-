@@ -107,7 +107,7 @@ fun UnreadScreen(
                             )
                         }
                     }
-                    items(items, key = { it.sender + it.millis + it.body.hashCode() }) { u ->
+                    items(items) { u ->
                         Column(
                             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),

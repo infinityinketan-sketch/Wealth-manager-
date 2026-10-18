@@ -1,6 +1,7 @@
 package com.example.ledger.data
 
 import androidx.room.withTransaction
+import kotlinx.coroutines.sync.withLock
 import com.example.ledger.core.Recurrence
 import com.example.ledger.core.MoneyMove
 import com.example.ledger.core.PaymentPoint
@@ -128,13 +129,36 @@ class LedgerRepository(private val db: LedgerDatabase) {
     private val day = 24 * 60 * minute
 
     /** Adds any starter category this install does not have yet (older installs, new app versions). */
-    suspend fun ensureStarterCategories() {
-        val have = categories.all().map { it.name.lowercase() to it.kind }.toSet()
-        for (c in StarterCategories.all) {
-            val kind = if (c.isIncome) EntryKind.INCOME else EntryKind.EXPENSE
-            if ((c.name.lowercase() to kind) !in have) categories.insert(Category(name = c.name, kind = kind, colorArgb = c.color))
+    private val categoryLock = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Adds any starter category this install does not have yet, and merges duplicates (two "Food &
+     * dining") that earlier versions could create when this ran twice at the same moment.
+     */
+    suspend fun ensureStarterCategories() = categoryLock.withLock {
+        db.withTransaction {
+            val all = categories.all()
+            for ((_, same) in all.groupBy { it.name.trim().lowercase() to it.kind }) {
+                if (same.size < 2) continue
+                val keep = same.minBy { it.id }
+                for (dup in same.filter { it.id != keep.id }) {
+                    transactions.moveCategory(dup.id, keep.id)
+                    merchantRules.moveCategory(dup.id, keep.id)
+                    overrides.moveCategory(dup.id, keep.id)
+                    budgets.moveCategory(dup.id, keep.id)
+                    categories.delete(dup)
+                }
+            }
+            val have = categories.all().map { it.name.trim().lowercase() to it.kind }.toSet()
+            for (c in StarterCategories.all) {
+                val kind = if (c.isIncome) EntryKind.INCOME else EntryKind.EXPENSE
+                if ((c.name.lowercase() to kind) !in have) categories.insert(Category(name = c.name, kind = kind, colorArgb = c.color))
+            }
         }
     }
+
+    /** Runs many writes as one, so screens update once instead of once per entry. */
+    suspend fun <T> batch(block: suspend () -> T): T = db.withTransaction { block() }
 
     suspend fun countSmsTransactions(): Int = transactions.countSms()
 
@@ -288,7 +312,8 @@ class LedgerRepository(private val db: LedgerDatabase) {
     suspend fun recategorize(items: List<LedgerTransaction>, categoryId: Long, remember: Boolean) {
         if (items.isEmpty()) return
         db.withTransaction {
-            transactions.setCategory(items.map { it.id }, categoryId)
+            // Older Android allows at most 999 values in one query: update in chunks.
+            items.map { it.id }.chunked(500).forEach { transactions.setCategory(it, categoryId) }
             overrides.upsertAll(items.mapNotNull { t -> t.smsKey?.let { EntryOverride(it, categoryId, t.note) } })
             if (remember) {
                 items.filter { it.merchantKey != null }.map { it.merchantKey!! to it.kind }.distinct().forEach { (key, kind) ->
@@ -317,6 +342,10 @@ class LedgerRepository(private val db: LedgerDatabase) {
     suspend fun reguessUncertain() {
         val ctx = newImportContext()
         val fallbackIds = ctx.categoryByName.filterKeys { it.first in StarterCategories.fallbackNames }.values.toList()
+        db.withTransaction { reguessIn(ctx, fallbackIds) }
+    }
+
+    private suspend fun reguessIn(ctx: ImportContext, fallbackIds: List<Long>) {
         for (t in transactions.uncertain(fallbackIds)) {
             if (t.smsKey != null && t.smsKey in ctx.overrides) continue // the person chose this one themselves
             val merchant = t.merchant ?: continue
