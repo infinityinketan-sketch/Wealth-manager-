@@ -145,3 +145,10 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
   category buttons (the app's guess, then the most used). Tapping the notification opens a quick picker.
 - The choice is remembered for that shop; shops already decided, self transfers, FD and card bills are not asked.
 - Switch under More › Settings: "Ask what each payment was for".
+
+## v0.11.0: encrypted backup & restore
+
+- More › Backup & restore: one file with all tables and settings, gzip + AES-256-GCM with a key from the
+  person's password (PBKDF2-HMAC-SHA256, 150k rounds) — `core/BackupCrypto.kt`, `data/Backup.kt`.
+- Saved wherever the person picks (Google Drive, Downloads…) through the system file picker; the app stays offline.
+- Restore replaces the data on the phone after asking for the password; newer-version backups are refused.

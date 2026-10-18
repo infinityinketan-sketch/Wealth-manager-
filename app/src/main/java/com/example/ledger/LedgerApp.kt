@@ -16,6 +16,8 @@ class LedgerApp : Application() {
         private set
     lateinit var settings: Settings
         private set
+    lateinit var database: LedgerDatabase
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -25,7 +27,8 @@ class LedgerApp : Application() {
             try { CrashLog.save(this, e, fatal = true) } catch (ignored: Throwable) { }
             previous?.uncaughtException(thread, e)
         }
-        repository = LedgerRepository(LedgerDatabase.build(this))
+        database = LedgerDatabase.build(this)
+        repository = LedgerRepository(database)
         settings = Settings(this)
 
         // Once a day, turn any recurring entries that have come due into real entries.

@@ -150,6 +150,41 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // ---- backup & restore ----
+
+    private val backupState = MutableStateFlow(settings.lastBackupMillis)
+    val lastBackup: StateFlow<Long> = backupState
+
+    fun backup(uri: android.net.Uri, password: CharArray) {
+        launchSafe {
+            val s = com.example.ledger.data.Backup.export(app, app.database, password, uri)
+            settings.lastBackupMillis = s.createdMillis
+            backupState.value = s.createdMillis
+            errorState.value = "Backup saved: ${s.transactions} entries. Keep the file and your password safe."
+        }
+    }
+
+    fun restore(uri: android.net.Uri, password: CharArray) {
+        viewModelScope.launch {
+            try {
+                val s = com.example.ledger.data.Backup.restore(app, app.database, password, uri)
+                // Settings may have changed: reload the ones screens hold.
+                startDayState.value = settings.budgetStartDay
+                countState.value = settings.countChoices
+                askState.value = settings.askCategory
+                declinedState.value = settings.declinedReminders
+                backupState.value = settings.lastBackupMillis
+                errorState.value = "Restored ${s.transactions} entries from your backup."
+                refreshSuggestions()
+            } catch (e: com.example.ledger.core.BackupCrypto.WrongPasswordOrFile) {
+                errorState.value = "Wrong password, or this is not a Wealth Manager backup file."
+            } catch (e: Exception) {
+                CrashLog.save(app, e, fatal = false)
+                errorState.value = "Could not restore: " + (e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
     // ---- "what was this for?" ----
 
     private val promptState = MutableStateFlow<Pair<LedgerTransaction, List<Category>>?>(null)

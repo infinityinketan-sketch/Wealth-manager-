@@ -80,6 +80,9 @@ fun MoreScreen(
     askCategory: Boolean = true,
     onAskCategoryChange: (Boolean) -> Unit = {},
     onProblemReport: () -> Unit = {},
+    lastBackupMillis: Long = 0L,
+    onBackup: () -> Unit = {},
+    onRestore: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var dialog by remember { mutableStateOf<MoreDialog?>(null) }
@@ -93,6 +96,8 @@ fun MoreScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item { BackupCard(lastBackupMillis, onBackup, onRestore) }
+
         // ---- Settings ----
         item { SectionTitle("Settings") }
         item {

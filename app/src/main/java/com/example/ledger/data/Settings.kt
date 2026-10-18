@@ -59,7 +59,13 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_ASK_CATEGORY, true)
         set(value) = prefs.edit().putBoolean(KEY_ASK_CATEGORY, value).apply()
 
+    /** When the last backup file was saved (0 = never). */
+    var lastBackupMillis: Long
+        get() = prefs.getLong(KEY_LAST_BACKUP, 0L)
+        set(value) = prefs.edit().putLong(KEY_LAST_BACKUP, value).apply()
+
     private companion object {
+        const val KEY_LAST_BACKUP = "last_backup"
         const val KEY_ASK_CATEGORY = "ask_category"
         const val KEY_TRACKING_NOTE = "tracking_note_seen"
         const val KEY_FULL_SCAN = "last_full_scan"

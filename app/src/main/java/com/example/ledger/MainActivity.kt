@@ -70,6 +70,9 @@ class MainActivity : FragmentActivity() {
     private var appLockEnabled by mutableStateOf(false)
     private var authInProgress = false
 
+    /** True while the system file picker is open for a backup/restore: do not lock the app for that. */
+    var pickingFile = false
+
     // BIOMETRIC_STRONG + DEVICE_CREDENTIAL is not supported on Android 9 and 10, so use WEAK.
     private val authenticators =
         BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -147,6 +150,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        pickingFile = false
         smsGranted = hasSmsPermission()
         // Pick up anything that arrived while the app was closed.
         if (smsGranted && !locked) viewModel.scanSms()
@@ -156,7 +160,7 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         // The system credential screen can briefly stop this activity; do not re-lock during that.
-        if (appLockEnabled && !authInProgress) locked = true
+        if (appLockEnabled && !authInProgress && !pickingFile) locked = true
     }
 
     private fun canAuthenticate(): Boolean =
@@ -281,6 +285,22 @@ private fun LedgerRoot(
     var showUnread by remember { mutableStateOf(false) }
     val prompt by viewModel.prompt.collectAsStateWithLifecycle()
     val askCategory by viewModel.askCategory.collectAsStateWithLifecycle()
+    val lastBackup by viewModel.lastBackup.collectAsStateWithLifecycle()
+    // Backup: password first, then the person picks where to save the file.
+    var askBackupPassword by remember { mutableStateOf(false) }
+    var backupPassword by remember { mutableStateOf<CharArray?>(null) }
+    val saveBackup = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        val pw = backupPassword
+        if (uri != null && pw != null) viewModel.backup(uri, pw)
+        backupPassword = null
+    }
+    // Restore: the person picks the file, then gives its password.
+    var restoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val openBackup = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> restoreUri = uri }
     val context = androidx.compose.ui.platform.LocalContext.current
     // Details of a crash from last time are offered once, on the next start.
     var problem by remember { mutableStateOf(com.example.ledger.data.CrashLog.read(context)) }
@@ -400,6 +420,12 @@ private fun LedgerRoot(
                 onDeleteRecurring = viewModel::deleteRecurring,
                 askCategory = askCategory,
                 onAskCategoryChange = viewModel::setAskCategory,
+                lastBackupMillis = lastBackup,
+                onBackup = { askBackupPassword = true },
+                onRestore = {
+                    (context as? MainActivity)?.pickingFile = true
+                    openBackup.launch(arrayOf("*/*"))
+                },
                 onProblemReport = {
                     problem = com.example.ledger.data.CrashLog.read(context)
                     showProblem = true
@@ -458,6 +484,29 @@ private fun LedgerRoot(
             categories = categories,
             onPick = { cat, rememberShop -> viewModel.answerPrompt(t.id, cat, rememberShop) },
             onDismiss = viewModel::closePrompt
+        )
+    }
+
+    if (askBackupPassword) {
+        com.example.ledger.ui.BackupPasswordDialog(
+            forRestore = false,
+            onDone = { pw ->
+                askBackupPassword = false
+                backupPassword = pw
+                (context as? MainActivity)?.pickingFile = true
+                saveBackup.launch("WealthManager-backup-" + java.time.LocalDate.now() + ".wmb")
+            },
+            onDismiss = { askBackupPassword = false }
+        )
+    }
+    restoreUri?.let { uri ->
+        com.example.ledger.ui.BackupPasswordDialog(
+            forRestore = true,
+            onDone = { pw ->
+                restoreUri = null
+                viewModel.restore(uri, pw)
+            },
+            onDismiss = { restoreUri = null }
         )
     }
 
