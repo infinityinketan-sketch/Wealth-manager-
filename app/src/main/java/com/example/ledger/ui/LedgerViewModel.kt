@@ -150,6 +150,33 @@ class LedgerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // ---- "what was this for?" ----
+
+    private val promptState = MutableStateFlow<Pair<LedgerTransaction, List<Category>>?>(null)
+    /** The payment opened from the notification, with quick category choices. */
+    val prompt: StateFlow<Pair<LedgerTransaction, List<Category>>?> = promptState
+
+    fun openPrompt(txId: Long) {
+        launchSafe { repo.transactionById(txId)?.let { promptState.value = it to repo.quickCategories(it, 4) } }
+    }
+
+    fun answerPrompt(txId: Long, categoryId: Long, rememberShop: Boolean) {
+        promptState.value = null
+        launchSafe { repo.answerPrompt(txId, categoryId, rememberShop) }
+    }
+
+    fun closePrompt() {
+        promptState.value = null
+    }
+
+    private val askState = MutableStateFlow(settings.askCategory)
+    val askCategory: StateFlow<Boolean> = askState
+
+    fun setAskCategory(on: Boolean) {
+        settings.askCategory = on
+        askState.value = on
+    }
+
     // ---- "some payments send no SMS" note ----
 
     private val noteState = MutableStateFlow(settings.trackingNoteSeen)

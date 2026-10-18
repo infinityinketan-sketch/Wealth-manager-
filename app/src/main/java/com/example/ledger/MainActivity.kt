@@ -54,6 +54,7 @@ import com.example.ledger.ui.SortScreen
 import com.example.ledger.ui.AddReminderDialog
 import com.example.ledger.ui.UnreadScreen
 import com.example.ledger.ui.ProblemReportDialog
+import com.example.ledger.ui.QuickCategoryDialog
 import com.example.ledger.ui.sortGroups
 import com.example.ledger.ui.TransactionEditor
 
@@ -102,6 +103,7 @@ class MainActivity : FragmentActivity() {
         locked = appLockEnabled
         smsGranted = hasSmsPermission()
         smsPromptDone = settings.smsPromptDone
+        handlePromptIntent(intent)
 
         setContent {
             LedgerTheme {
@@ -125,6 +127,21 @@ class MainActivity : FragmentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handlePromptIntent(intent)
+    }
+
+    /** Opened from a "what was this for?" notification: show the quick category picker. */
+    private fun handlePromptIntent(intent: android.content.Intent?) {
+        val txId = intent?.getLongExtra(com.example.ledger.work.CategoryPrompt.EXTRA_TX, -1L) ?: -1L
+        if (txId >= 0) {
+            com.example.ledger.work.CategoryPrompt.cancel(this, com.example.ledger.work.CategoryPrompt.notificationFor(txId))
+            viewModel.openPrompt(txId)
+            intent?.removeExtra(com.example.ledger.work.CategoryPrompt.EXTRA_TX)
         }
     }
 
@@ -262,6 +279,8 @@ private fun LedgerRoot(
     val unread by viewModel.unread.collectAsStateWithLifecycle()
     val scanStats by viewModel.scanStats.collectAsStateWithLifecycle()
     var showUnread by remember { mutableStateOf(false) }
+    val prompt by viewModel.prompt.collectAsStateWithLifecycle()
+    val askCategory by viewModel.askCategory.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     // Details of a crash from last time are offered once, on the next start.
     var problem by remember { mutableStateOf(com.example.ledger.data.CrashLog.read(context)) }
@@ -379,6 +398,8 @@ private fun LedgerRoot(
                 onSetBudget = viewModel::setBudget,
                 onToggleRecurring = viewModel::setRecurringActive,
                 onDeleteRecurring = viewModel::deleteRecurring,
+                askCategory = askCategory,
+                onAskCategoryChange = viewModel::setAskCategory,
                 onProblemReport = {
                     problem = com.example.ledger.data.CrashLog.read(context)
                     showProblem = true
@@ -427,6 +448,16 @@ private fun LedgerRoot(
                 showEditor = true
             },
             onDismiss = { openCategory = null }
+        )
+    }
+
+    prompt?.let { (t, quick) ->
+        QuickCategoryDialog(
+            t = t,
+            suggestions = quick,
+            categories = categories,
+            onPick = { cat, rememberShop -> viewModel.answerPrompt(t.id, cat, rememberShop) },
+            onDismiss = viewModel::closePrompt
         )
     }
 

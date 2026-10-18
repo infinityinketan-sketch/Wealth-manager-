@@ -357,6 +357,39 @@ class LedgerRepository(private val db: LedgerDatabase) {
         }
     }
 
+    // ---- "what was this for?" prompts ----
+
+    suspend fun transactionBySmsKey(smsKey: String): LedgerTransaction? = transactions.findBySmsKey(smsKey)
+    suspend fun transactionById(id: Long): LedgerTransaction? = transactions.findById(id)
+    suspend fun allCategories(): List<Category> = categories.all()
+
+    suspend fun hasRule(merchantKey: String, kind: EntryKind): Boolean =
+        merchantRules.all().any { it.merchantKey == merchantKey && it.kind == kind }
+
+    /** Up to [limit] quick choices: the app's guess first (if it is a real one), then the most used. */
+    suspend fun quickCategories(t: LedgerTransaction, limit: Int): List<Category> {
+        val cats = categories.all()
+        val byId = cats.associateBy { it.id }
+        val out = ArrayList<Category>()
+        val guess = t.categoryId?.let { byId[it] }
+        if (guess != null && guess.name !in StarterCategories.fallbackNames) out.add(guess)
+        val recent = transactions.topCategoryIds(t.kind, LocalDate.now().minusDays(90).toEpochDay(), 10)
+        val defaults = if (t.kind == EntryKind.INCOME) listOf("Salary", "Received from people", "Refund")
+        else listOf("Food & dining", "Groceries", "Health", "Transport", "Online shopping")
+        val candidates = recent.mapNotNull { byId[it] } + defaults.mapNotNull { n -> cats.firstOrNull { it.name == n && it.kind == t.kind } }
+        for (c in candidates) {
+            if (out.size >= limit) break
+            if (c.kind == t.kind && c.name !in StarterCategories.fallbackNames && out.none { it.id == c.id }) out.add(c)
+        }
+        return out
+    }
+
+    /** The person picked a category from the prompt: set it, and remember the shop when there is one. */
+    suspend fun answerPrompt(txId: Long, categoryId: Long, rememberShop: Boolean) {
+        val t = transactions.findById(txId) ?: return
+        recategorize(listOf(t), categoryId, remember = rememberShop && t.merchantKey != null)
+    }
+
     // ---- self-transfers ----
 
     /**

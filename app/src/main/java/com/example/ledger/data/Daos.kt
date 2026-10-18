@@ -40,6 +40,19 @@ interface TransactionDao {
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE id IN (:ids)")
     suspend fun setCategory(ids: List<Long>, categoryId: Long)
 
+    @Query("SELECT * FROM transactions WHERE smsKey = :smsKey LIMIT 1")
+    suspend fun findBySmsKey(smsKey: String): LedgerTransaction?
+
+    @Query("SELECT * FROM transactions WHERE id = :id")
+    suspend fun findById(id: Long): LedgerTransaction?
+
+    /** The person's most used categories of one kind lately (for quick choices). */
+    @Query(
+        "SELECT categoryId FROM transactions WHERE kind = :kind AND categoryId IS NOT NULL AND epochDay >= :fromDay " +
+            "GROUP BY categoryId ORDER BY COUNT(*) DESC LIMIT :limit"
+    )
+    suspend fun topCategoryIds(kind: EntryKind, fromDay: Long, limit: Int): List<Long>
+
     @Query("SELECT COUNT(*) FROM transactions WHERE smsKey IS NOT NULL")
     suspend fun countSms(): Int
 

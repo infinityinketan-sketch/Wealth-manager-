@@ -54,7 +54,13 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_TRACKING_NOTE, false)
         set(value) = prefs.edit().putBoolean(KEY_TRACKING_NOTE, value).apply()
 
+    /** Ask "what was this for?" after each new payment or credit read from SMS. */
+    var askCategory: Boolean
+        get() = prefs.getBoolean(KEY_ASK_CATEGORY, true)
+        set(value) = prefs.edit().putBoolean(KEY_ASK_CATEGORY, value).apply()
+
     private companion object {
+        const val KEY_ASK_CATEGORY = "ask_category"
         const val KEY_TRACKING_NOTE = "tracking_note_seen"
         const val KEY_FULL_SCAN = "last_full_scan"
         const val KEY_COUNT = "count_choices"

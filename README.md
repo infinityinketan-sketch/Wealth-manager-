@@ -138,3 +138,10 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - Bulk category moves are split into chunks (older SQLite allows 999 values per query).
 - Starter categories are added under a lock; duplicates created by earlier versions are merged.
 - SMS import and re-guessing write in batches, so screens refresh a few times instead of once per entry.
+
+## v0.10.0: "What was this for?"
+
+- After each new payment or credit read from SMS, a notification asks what it was for, with three one-tap
+  category buttons (the app's guess, then the most used). Tapping the notification opens a quick picker.
+- The choice is remembered for that shop; shops already decided, self transfers, FD and card bills are not asked.
+- Switch under More › Settings: "Ask what each payment was for".

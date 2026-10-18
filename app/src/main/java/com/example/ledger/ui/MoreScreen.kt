@@ -77,6 +77,8 @@ fun MoreScreen(
     onSetBudget: (Long, Long) -> Unit,
     onToggleRecurring: (RecurringRule, Boolean) -> Unit,
     onDeleteRecurring: (RecurringRule) -> Unit,
+    askCategory: Boolean = true,
+    onAskCategoryChange: (Boolean) -> Unit = {},
     onProblemReport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -119,6 +121,22 @@ fun MoreScreen(
                             )
                         }
                         Switch(checked = appLockEnabled, onCheckedChange = onAppLockChange)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Ask what each payment was for")
+                            Text(
+                                "A notification after each new payment or credit, with one-tap categories. " +
+                                    "Shops you already chose for are not asked again.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = askCategory, onCheckedChange = onAskCategoryChange)
                     }
                 }
             }
