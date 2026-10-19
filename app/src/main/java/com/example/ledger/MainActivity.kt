@@ -81,6 +81,7 @@ class MainActivity : FragmentActivity() {
 
     private var smsGranted by mutableStateOf(false)
     private var smsPromptDone by mutableStateOf(false)
+    private var showOnboarding by mutableStateOf(false)
 
     private fun hasSmsPermission() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED &&
@@ -106,12 +107,19 @@ class MainActivity : FragmentActivity() {
         locked = appLockEnabled
         smsGranted = hasSmsPermission()
         smsPromptDone = settings.smsPromptDone
+        showOnboarding = !settings.onboardingSeen
         handlePromptIntent(intent)
 
         setContent {
             LedgerTheme {
                 if (locked) {
                     LockedScreen(onUnlock = { authenticate() })
+                } else if (showOnboarding) {
+                    // How the app keeps money data safe: shown before anything else.
+                    com.example.ledger.ui.OnboardingScreen(onFinish = {
+                        settings.onboardingSeen = true
+                        showOnboarding = false
+                    })
                 } else if (!smsGranted && !smsPromptDone) {
                     SmsIntroScreen(
                         onAllow = { requestSms() },
@@ -126,7 +134,8 @@ class MainActivity : FragmentActivity() {
                         appLockEnabled = appLockEnabled,
                         onAppLockChange = { setAppLock(it) },
                         smsGranted = smsGranted,
-                        onEnableSms = { requestSms() }
+                        onEnableSms = { requestSms() },
+                        onShowSafety = { showOnboarding = true }
                     )
                 }
             }
@@ -269,7 +278,8 @@ private fun LedgerRoot(
     appLockEnabled: Boolean,
     onAppLockChange: (Boolean) -> Unit,
     smsGranted: Boolean,
-    onEnableSms: () -> Unit
+    onEnableSms: () -> Unit,
+    onShowSafety: () -> Unit
 ) {
     val scan by viewModel.scan.collectAsStateWithLifecycle()
     var pendingLearn by remember { mutableStateOf<LedgerTransaction?>(null) }
@@ -426,6 +436,7 @@ private fun LedgerRoot(
                     (context as? MainActivity)?.pickingFile = true
                     openBackup.launch(arrayOf("*/*"))
                 },
+                onShowSafety = onShowSafety,
                 onProblemReport = {
                     problem = com.example.ledger.data.CrashLog.read(context)
                     showProblem = true

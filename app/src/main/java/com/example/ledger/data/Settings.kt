@@ -64,7 +64,13 @@ class Settings(context: Context) {
         get() = prefs.getLong(KEY_LAST_BACKUP, 0L)
         set(value) = prefs.edit().putLong(KEY_LAST_BACKUP, value).apply()
 
+    /** True once the safety walkthrough was finished or skipped. */
+    var onboardingSeen: Boolean
+        get() = prefs.getBoolean(KEY_ONBOARDING, false)
+        set(value) = prefs.edit().putBoolean(KEY_ONBOARDING, value).apply()
+
     private companion object {
+        const val KEY_ONBOARDING = "onboarding_seen"
         const val KEY_LAST_BACKUP = "last_backup"
         const val KEY_ASK_CATEGORY = "ask_category"
         const val KEY_TRACKING_NOTE = "tracking_note_seen"

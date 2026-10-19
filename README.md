@@ -152,3 +152,10 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
   person's password (PBKDF2-HMAC-SHA256, 150k rounds) — `core/BackupCrypto.kt`, `data/Backup.kt`.
 - Saved wherever the person picks (Google Drive, Downloads…) through the system file picker; the app stays offline.
 - Restore replaces the data on the phone after asking for the password; newer-version backups are refused.
+
+## v0.12.0: safety walkthrough
+
+- First launch opens 4 swipeable pages before anything else (`ui/OnboardingScreen.kt`): data stays on the phone
+  (no internet, no account, no ads), only bank messages are read, the app can never move money (never asks for
+  password/PIN/OTP), and the person stays in control (app lock, password backups, uninstall removes all).
+- Skip / Next / Get started; reopen any time from More › "How your data is kept safe".

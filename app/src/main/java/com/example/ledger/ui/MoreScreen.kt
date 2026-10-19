@@ -79,6 +79,7 @@ fun MoreScreen(
     onDeleteRecurring: (RecurringRule) -> Unit,
     askCategory: Boolean = true,
     onAskCategoryChange: (Boolean) -> Unit = {},
+    onShowSafety: () -> Unit = {},
     onProblemReport: () -> Unit = {},
     lastBackupMillis: Long = 0L,
     onBackup: () -> Unit = {},
@@ -101,7 +102,10 @@ fun MoreScreen(
         // ---- Settings ----
         item { SectionTitle("Settings") }
         item {
-            TextButton(onClick = onProblemReport) { Text("Problem report (copy crash details)") }
+            Column {
+                TextButton(onClick = onShowSafety) { Text("How your data is kept safe") }
+                TextButton(onClick = onProblemReport) { Text("Problem report (copy crash details)") }
+            }
         }
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
