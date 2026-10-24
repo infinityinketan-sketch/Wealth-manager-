@@ -7,21 +7,43 @@ plugins {
 
 android {
     namespace = "com.example.ledger"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
-        // Change this before the first Play upload: the application id can never be changed afterwards.
-        applicationId = "com.example.ledger"
+        // Permanent Play Store id: never change it after the first upload.
+        applicationId = "in.wealthmanager.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 16
-        versionName = "0.12.0"
+        // Google Play requires Android 16 (API 36) for new apps and updates from 31 Aug 2026.
+        targetSdk = 36
+        versionCode = 17
+        versionName = "1.0.0"
+    }
+
+    // The upload key comes from environment variables (GitHub secrets in the release workflow);
+    // it is never stored in the repository.
+    val keystorePath = System.getenv("WM_KEYSTORE_PATH")
+    signingConfigs {
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("WM_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("WM_KEY_ALIAS")
+                keyPassword = System.getenv("WM_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            // Test builds install next to the Play version instead of replacing it.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-test"
+        }
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -54,6 +76,9 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.biometric:biometric:1.1.0")
+
+    // Google Play Billing for the one-time Pro unlock (Play requires version 8 or later).
+    implementation("com.android.billingclient:billing:8.0.0")
 
     testImplementation("junit:junit:4.13.2")
 }

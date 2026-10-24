@@ -37,8 +37,10 @@ abstract class LedgerDatabase : RoomDatabase() {
             Room.databaseBuilder(context.applicationContext, LedgerDatabase::class.java, "ledger.db")
                 .addCallback(SeedCallback)
                 .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
-                // Test builds only: moving from the empty stage-1 database simply starts fresh.
-                .fallbackToDestructiveMigration()
+                // Never wipe people's data on an upgrade: every new version must add a migration.
+                // Only the very first test database (version 1) and downgrades may start fresh.
+                .fallbackToDestructiveMigrationFrom(1)
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
     }
 

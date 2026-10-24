@@ -1,0 +1,4 @@
+<resources>
+    <!-- Test builds are named differently so they are easy to tell apart from the Play version. -->
+    <string name="app_name">Wealth Manager (test)</string>
+</resources>

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
         SMS is read on the phone only, to find bank and UPI transactions. There is no INTERNET
@@ -10,6 +11,8 @@
     <!-- Bill reminders shown on the phone (Android 13+ asks for this). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <!-- Promise kept even if a library asks for it: the app never gets internet access. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
 
     <application
         android:name=".LedgerApp"
