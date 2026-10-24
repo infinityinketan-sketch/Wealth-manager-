@@ -18,6 +18,22 @@ service cloud.firestore {
         && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null);
     }
 
+    // Feedback: anyone signed in can send; only the sender can list or delete their own
+    // (for account deletion). Nobody can read others' feedback from the app; you read it in the console.
+    match /feedback/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'type', 'message', 'rating', 'replyTo', 'crash',
+             'createdAt', 'appVersion', 'androidVersion', 'deviceModel', 'plan', 'status'])
+        && request.resource.data.message is string && request.resource.data.message.size() <= 2000
+        && request.resource.data.get('crash', '').size() <= 8000
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAt == request.time
+        && (!('replyTo' in request.resource.data) || request.resource.data.replyTo == request.auth.token.email);
+      allow list, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow get, update: if false;
+    }
+
     // Trial start per Google account, keyed by a one-way hash of the email.
     // Can be created once (with the server's own time) and never changed or deleted by the app.
     match /trials/{id} {

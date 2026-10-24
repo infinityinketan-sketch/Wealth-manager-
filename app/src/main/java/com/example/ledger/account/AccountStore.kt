@@ -207,6 +207,36 @@ class AccountStore(private val context: Context, private val settings: Settings)
         db?.collection("users")?.document(user.uid)?.set(update, SetOptions.merge())
     }
 
+    /**
+     * Saves one feedback message in Firestore (collection "feedback"). Long numbers and UPI/email ids
+     * are hidden before sending. The email is attached only when the person asks for a reply.
+     */
+    suspend fun sendFeedback(type: String, rating: Int?, message: String, wantsReply: Boolean, crashReport: String?): Boolean {
+        val user = auth?.currentUser ?: run { publish("Sign in to send feedback."); return false }
+        val store = db ?: return false
+        val data = mutableMapOf<String, Any?>(
+            "uid" to user.uid,
+            "type" to type,
+            "message" to com.example.ledger.core.Redact.text(message.trim()).take(2000),
+            "createdAt" to FieldValue.serverTimestamp(),
+            "appVersion" to BuildConfig.VERSION_NAME,
+            "androidVersion" to Build.VERSION.RELEASE,
+            "deviceModel" to (Build.MANUFACTURER + " " + Build.MODEL),
+            "plan" to (if (settings.proPurchased) "lifetime" else if (settings.hasPaid) settings.subPlan ?: "subscription" else "trial"),
+            "status" to "new"
+        )
+        if (rating != null) data["rating"] = rating
+        if (wantsReply) data["replyTo"] = user.email
+        if (!crashReport.isNullOrBlank()) data["crash"] = com.example.ledger.core.Redact.text(crashReport).take(8000)
+        return try {
+            store.collection("feedback").add(data).await()
+            true
+        } catch (e: Exception) {
+            publish("Could not send feedback: " + (e.message ?: "please try again when online."))
+            false
+        }
+    }
+
     suspend fun signOut() {
         auth?.signOut()
         try { CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest()) } catch (e: Exception) { }
@@ -221,6 +251,8 @@ class AccountStore(private val context: Context, private val settings: Settings)
         val user = auth?.currentUser ?: return false
         publish(busy = true)
         return try {
+            // The person's feedback goes too.
+            db?.collection("feedback")?.whereEqualTo("uid", user.uid)?.get()?.await()?.documents?.forEach { it.reference.delete().await() }
             db?.collection("users")?.document(user.uid)?.delete()?.await()
             try {
                 user.delete().await()

@@ -81,6 +81,7 @@ fun MoreScreen(
     onAskCategoryChange: (Boolean) -> Unit = {},
     onShowSafety: () -> Unit = {},
     onProblemReport: () -> Unit = {},
+    onFeedback: () -> Unit = {},
     lastBackupMillis: Long = 0L,
     onBackup: () -> Unit = {},
     onRestore: () -> Unit = {},
@@ -117,6 +118,7 @@ fun MoreScreen(
         item { SectionTitle("Settings") }
         item {
             Column {
+                TextButton(onClick = onFeedback) { Text("Send feedback") }
                 TextButton(onClick = onShowSafety) { Text("How your data is kept safe") }
                 TextButton(onClick = onProblemReport) { Text("Problem report (copy crash details)") }
             }

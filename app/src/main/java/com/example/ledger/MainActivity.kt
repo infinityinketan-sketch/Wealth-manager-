@@ -385,6 +385,8 @@ private fun LedgerRoot(
     val accountState by app.account.state.collectAsStateWithLifecycle()
     var usageConsent by remember { mutableStateOf(app.settings.usageConsent) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // Feedback form open (true = with the crash report attached).
+    var feedback by remember { mutableStateOf<Boolean?>(null) }
     // (reason, trial just ended) when the Pro sheet is open.
     var proAsk by remember { mutableStateOf<Pair<String?, Boolean>?>(null) }
     androidx.compose.runtime.LaunchedEffect(pro.isPro) {
@@ -528,6 +530,7 @@ private fun LedgerRoot(
                 },
                 onSignOut = { scope.launch { app.account.signOut() } },
                 onDeleteAccount = { (context as? android.app.Activity)?.let { a -> scope.launch { app.account.deleteAccount(a) } } },
+                onFeedback = { feedback = false },
                 onProblemReport = {
                     problem = com.example.ledger.data.CrashLog.read(context)
                     showProblem = true
@@ -629,8 +632,29 @@ private fun LedgerRoot(
         )
     }
 
+    feedback?.let { withCrash ->
+        com.example.ledger.ui.FeedbackDialog(
+            email = accountState.email,
+            crashReport = com.example.ledger.data.CrashLog.read(context),
+            attachCrashFirst = withCrash,
+            onSend = { type, rating, message, reply, crash, done ->
+                scope.launch {
+                    val ok = app.account.sendFeedback(type, rating, message, reply, crash)
+                    if (ok && crash != null) {
+                        com.example.ledger.data.CrashLog.clear(context)
+                        problem = null
+                    }
+                    if (!ok) app.account.state.value.error?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                    done(ok)
+                }
+            },
+            onDismiss = { feedback = null }
+        )
+    }
+
     if (showProblem) {
         ProblemReportDialog(
+            onSend = if (accountState.signedIn) { { showProblem = false; feedback = true } } else null,
             report = problem,
             onClear = {
                 com.example.ledger.data.CrashLog.clear(context)

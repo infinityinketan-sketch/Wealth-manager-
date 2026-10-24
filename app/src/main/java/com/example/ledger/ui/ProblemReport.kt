@@ -15,7 +15,7 @@ import androidx.compose.ui.text.AnnotatedString
 
 /** Shows the saved details of the last crash so the person can copy and send them. */
 @Composable
-fun ProblemReportDialog(report: String?, onClear: () -> Unit, onDismiss: () -> Unit) {
+fun ProblemReportDialog(report: String?, onClear: () -> Unit, onDismiss: () -> Unit, onSend: (() -> Unit)? = null) {
     val clipboard = LocalClipboardManager.current
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -26,7 +26,7 @@ fun ProblemReportDialog(report: String?, onClear: () -> Unit, onDismiss: () -> U
                     Text("No problems recorded.")
                 } else {
                     Text(
-                        "Sorry about that. Copy these details and send them, so it can be fixed. " +
+                        "Sorry about that. Send these details so it can be fixed. " +
                             "They contain no messages, amounts or account numbers.",
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -38,7 +38,10 @@ fun ProblemReportDialog(report: String?, onClear: () -> Unit, onDismiss: () -> U
         },
         confirmButton = {
             if (report != null) {
-                TextButton(onClick = { clipboard.setText(AnnotatedString(report)) }) { Text("Copy details") }
+                androidx.compose.foundation.layout.Row {
+                    TextButton(onClick = { clipboard.setText(AnnotatedString(report)) }) { Text("Copy") }
+                    if (onSend != null) androidx.compose.material3.Button(onClick = onSend) { Text("Send to developer") }
+                }
             }
         },
         dismissButton = {
