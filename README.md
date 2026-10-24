@@ -1,6 +1,6 @@
 # Wealth Manager: stage 1, core ledger
 
-Android expense and income tracker. Everything stays on the phone: no internet permission, no SMS permission, no account.
+Android expense and income tracker for India. Bank SMS and money data stay on the phone; Google sign-in holds only the account and free trial.
 
 ## What is in this stage
 - Income and expense entries with categories, accounts (cash, bank, UPI, card) and notes
@@ -31,7 +31,7 @@ See [RELEASE.md](RELEASE.md) for the step-by-step checklist and [STORE_LISTING.m
 App id `in.wealthmanager.app` (fixed forever once uploaded). Debug builds install alongside as `in.wealthmanager.app.debug`, named "Wealth Manager (test)".
 
 ## Status of this code
-Every push is built in GitHub Actions: debug APK, unit tests, and a shrunk release build that is checked to have no INTERNET permission. The **build-release** workflow makes the signed `.aab` for Play.
+Every push is built in GitHub Actions: debug APK, unit tests, and a shrunk release build that is checked to have no advertising-ID permission. The **build-release** workflow makes the signed `.aab` for Play.
 
 ## Stage 2: automatic SMS capture (v0.2.0)
 
@@ -166,4 +166,11 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - Privacy policy page in `docs/` (GitHub Pages).
 - Signed release workflow; release builds are shrunk with R8 and checked for no INTERNET permission.
 - Database upgrades never wipe data from v2 onwards.
+
+## v1.1.0: Google sign-in and free trial per account
+- Sign in with Google (Credential Manager + Firebase Auth) after the safety pages, with DPDP-style consent; usage sharing is a separate optional choice.
+- The 30-day trial is counted per Google account on the server (reinstalling does not restart it). After it ends, the whole app is locked until the one-time ₹149 unlock; only Unlock, Restore purchase, Sign out and Delete account remain.
+- Account record in Firestore: name, email, sign-up/last-open dates, app/Android version, phone model, Pro status, and feature-use counts only with consent. SMS and money data are never sent.
+- In-app and web account deletion (`docs/delete-account.html`). Firestore security rules in `firestore.rules`.
+- Fixed debug signing key (`app/debug.keystore`) so Google sign-in works in CI test builds.
 

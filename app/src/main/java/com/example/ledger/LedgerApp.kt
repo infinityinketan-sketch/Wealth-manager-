@@ -36,6 +36,7 @@ class LedgerApp : Application() {
         settings = Settings(this)
         pro = com.example.ledger.billing.ProStore(this, settings)
         account = com.example.ledger.account.AccountStore(this, settings)
+        account.onTrialUpdated = { pro.refresh() }
 
         // Once a day, turn any recurring entries that have come due into real entries.
         val request = PeriodicWorkRequestBuilder<RecurringWorker>(1, TimeUnit.DAYS).build()

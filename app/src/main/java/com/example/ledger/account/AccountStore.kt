@@ -54,6 +54,9 @@ class AccountStore(private val context: Context, private val settings: Settings)
     private val _state = MutableStateFlow(current())
     val state: StateFlow<AccountState> = _state.asStateFlow()
 
+    /** Called when the server's trial date was read, so the lock screen can update at once. */
+    var onTrialUpdated: (() -> Unit)? = null
+
     /** Usage counts not yet sent; sent with the next app open. */
     private val pendingUsage = mutableMapOf<String, Long>()
 
@@ -183,7 +186,10 @@ class AccountStore(private val context: Context, private val settings: Settings)
         // Keep the server's trial start (also corrects a phone whose clock was changed).
         user.email?.trim()?.lowercase()?.let { email ->
             store.collection("trials").document(sha256(email)).get().addOnSuccessListener { snap ->
-                snap.getTimestamp("start")?.let { settings.trialStartMillis = it.toDate().time }
+                snap.getTimestamp("start")?.let {
+                    settings.trialStartMillis = it.toDate().time
+                    onTrialUpdated?.invoke()
+                }
             }
         }
     }

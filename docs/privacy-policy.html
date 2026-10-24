@@ -15,57 +15,76 @@
   .card { background:var(--card); border-radius:16px; padding:16px 20px; margin-top:20px; }
   .muted { color:var(--muted); font-size:14px; }
   li { margin:6px 0; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border-radius:12px; overflow:hidden; font-size:15px; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid rgba(127,127,127,.2); vertical-align:top; }
 </style>
 </head>
 <body><main>
-<header><img src="icon.png" alt=""><div><h1>Privacy Policy</h1><div class="muted">Wealth Manager for Android · Effective 24 October 2026</div></div></header>
+<header><img src="icon.png" alt=""><div><h1>Privacy Policy</h1><div class="muted">Wealth Manager for Android · Effective 25 October 2026</div></div></header>
 
-<div class="card"><strong>In short:</strong> Wealth Manager reads bank and payment SMS on your phone to track your money.
-Everything stays on your phone. The app has no internet permission, has no account or login, and sends no data to us or to anyone else.</div>
+<div class="card"><strong>In short:</strong> your SMS, transactions, amounts, balances and bank details stay on your phone and are never sent to any server.
+To run your account and free trial you sign in with Google, and we keep your name, email and a few app details listed below.
+We do not sell or share your data, and you can delete your account at any time.</div>
 
-<h2>What the app reads</h2>
+<h2>Who we are</h2>
+<p>Wealth Manager is published by DEVELOPER_NAME, Pune, India ("we"). For India's Digital Personal Data Protection Act, 2023, we are the Data Fiduciary for the account data described below.
+Contact and grievances: <a href="mailto:SUPPORT_EMAIL">SUPPORT_EMAIL</a>.</p>
+
+<h2>Data that stays only on your phone</h2>
 <ul>
-  <li><strong>SMS messages</strong> (only with your permission). The app looks for messages from banks, card issuers, UPI apps and lenders,
-  and turns them into transactions: amount, date, account ending digits, merchant name and balance where the bank includes it.
-  Personal messages are skipped and not stored.</li>
-  <li><strong>Entries you type in</strong>: cash spending, categories, budgets, reminders and notes.</li>
+  <li><strong>SMS messages</strong> (only with your permission). The app finds messages from banks, card issuers, UPI apps and lenders and turns them into transactions
+  (amount, date, last digits of the account, merchant, balance). Personal messages are skipped and not stored.</li>
+  <li>Everything you enter or the app works out: transactions, categories, budgets, reminders, notes, balances.</li>
+</ul>
+<p>None of this is uploaded, synced or shared. It is kept in the app's private storage, which other apps cannot read. Android cloud backup is turned off for this app.</p>
+
+<h2>Data we collect, and why</h2>
+<table>
+<tr><th>Data</th><th>Why</th></tr>
+<tr><td>Google account name and email address</td><td>To create and run your account, link your free trial and purchase, and contact you about your account if you write to us.</td></tr>
+<tr><td>Sign-up date, last-open date, free-trial start date</td><td>To run the 30-day free trial fairly (one per Google account).</td></tr>
+<tr><td>App version, Android version, phone make and model</td><td>To support you and fix problems on specific phones and versions.</td></tr>
+<tr><td>Whether Pro is unlocked</td><td>To support purchase questions.</td></tr>
+<tr><td>Feature-use counts (for example how often the app is opened or the sort screen is used), <strong>only if you turn this on</strong></td><td>To understand which features help people and improve the app. Counts only; no money data.</td></tr>
+</table>
+<p>We do not collect your phone number, contacts, location, advertising ID, SMS content or any financial information.</p>
+
+<h2>Consent and your choices</h2>
+<ul>
+  <li>Before sign-in the app shows what is kept and asks for your consent. Feature-use sharing is a separate, optional choice.</li>
+  <li>You can turn feature-use sharing off at any time in More → Account; the counts already stored are deleted.</li>
+  <li>You can withdraw consent for your account data by deleting your account (below). The app cannot be used without an account.</li>
 </ul>
 
-<h2>Where your data is kept</h2>
-<ul>
-  <li>Only in the app's private storage on your phone. Other apps cannot read it.</li>
-  <li>The app is built without the Android <em>INTERNET</em> permission, so it cannot upload anything, even by mistake.</li>
-  <li>Android's automatic cloud backup is turned off for this app, so your data is not copied to Google Drive behind your back.</li>
-  <li>We run no servers and use no analytics, advertising or crash-reporting services. If the app crashes, the details are saved on your phone
-  and you can choose to copy them yourself (long numbers are masked).</li>
-</ul>
-
-<h2>Backup files</h2>
-<p>If you choose "Back up now", the app writes one file to the place you pick (for example your Downloads folder or a Drive folder you select).
-The file is encrypted with AES-256 using a password only you know; we cannot open it and cannot recover a forgotten password.
-Where you keep that file is up to you.</p>
+<h2>Where it is stored and who processes it</h2>
+<p>Account data is stored in Google Firebase (Firebase Authentication and Cloud Firestore), operated by Google as our processor, and is encrypted in transit and at rest.
+Each person can only read their own record. Sign-in is handled by Google under <a href="https://policies.google.com/privacy">Google's Privacy Policy</a>.</p>
 
 <h2>Purchases</h2>
-<p>Wealth Manager Pro is a one-time in-app purchase handled entirely by Google Play. Google Play processes your payment under
-<a href="https://policies.google.com/privacy">Google's Privacy Policy</a>. The app only receives a yes/no answer from the Google Play app on your phone about whether Pro was bought.
-We never see your card, UPI or payment details.</p>
+<p>The one-time Pro unlock is sold and processed by Google Play. We never see your card, UPI or bank details; the app only learns from Google Play whether Pro was bought.</p>
 
-<h2>Notifications</h2>
-<p>With your permission, the app shows notifications on your phone (for example "what was this payment for?" and bill due reminders). They are created on the phone; nothing is sent from a server.</p>
+<h2>How long we keep it</h2>
+<ul>
+  <li>Account data: while your account exists. When you delete your account it is erased straight away from our database (and within 30 days from any backups).</li>
+  <li>After deletion we keep only a one-way code (a SHA-256 hash) of your email and the trial start date, so the free trial cannot be claimed again. It cannot be turned back into your email.</li>
+  <li>Accounts not used for 3 years may be deleted.</li>
+</ul>
+
+<h2>Your rights</h2>
+<p>You can ask to see, correct or erase your data, withdraw consent, raise a grievance, or (under the DPDP Act) nominate someone to act for you, by writing to <a href="mailto:SUPPORT_EMAIL">SUPPORT_EMAIL</a>.
+We reply within 30 days. If you are not satisfied, you may complain to the Data Protection Board of India.</p>
+
+<h2>Deleting your account</h2>
+<p>In the app: More → Account → Delete account. Without the app: see <a href="delete-account.html">how to request deletion</a>.
+Uninstalling the app removes the data on your phone; it does not delete your account.</p>
 
 <h2>Sharing</h2>
-<p>We do not sell, share or transfer your data, because we never receive it.</p>
+<p>We do not sell, rent or share your personal data with anyone, and there are no ads. We would disclose data only if required by Indian law.</p>
 
-<h2>Deleting your data</h2>
-<p>Uninstall the app, or clear its storage in Android Settings → Apps → Wealth Manager → Storage. This removes everything. Backup files you saved yourself are not touched; delete them where you stored them.</p>
-
-<h2>Children</h2>
-<p>The app is meant for adults managing their own money and is not directed at children under 13.</p>
+<h2>Age</h2>
+<p>Wealth Manager is for people aged 18 and over.</p>
 
 <h2>Changes</h2>
-<p>If this policy changes, the new version will be posted on this page with a new effective date.</p>
-
-<h2>Contact</h2>
-<p>Questions: <a href="mailto:SUPPORT_EMAIL">SUPPORT_EMAIL</a></p>
+<p>If this policy changes we will update this page and its date, and show a notice in the app for important changes.</p>
 </main></body>
 </html>

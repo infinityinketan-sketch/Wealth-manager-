@@ -8,11 +8,11 @@ Copy-paste text for Play Console. Character limits are Play's.
 Wealth Manager: SMS Expenses
 
 **Short description** (80 max)
-Auto-track spending from bank & UPI SMS. No internet, no login, stays on phone.
+Auto-track spending from bank & UPI SMS. Your messages never leave your phone.
 
 **Full description** (4000 max)
 
-Wealth Manager tracks your money automatically from the SMS your bank already sends you, and keeps everything on your phone.
+Wealth Manager tracks your money automatically from the SMS your bank already sends you. Your messages and money data stay on your phone.
 
 ★ AUTOMATIC TRACKING
 • Reads bank, UPI, credit card and loan SMS from all major Indian banks
@@ -36,17 +36,17 @@ Wealth Manager tracks your money automatically from the SMS your bank already se
 • Repeating payments detected for you
 
 ★ PRIVATE BY DESIGN
-• No internet permission: the app cannot upload your data, even by mistake
-• No signup, no login, no ads, no tracking
+• Your SMS, amounts, balances and bank details are never uploaded
+• Sign in with Google: only your name, email and basic app details are kept for your account
+• No ads, no advertising ID, and your details are never sold
 • Optional app lock with fingerprint or screen lock
 • Encrypted backup file (AES-256, your password) to move to a new phone
 
 ★ GOOD TO KNOW
 Some payments send no SMS (small UPI payments on some banks, cash, wallets). You can add those yourself in two taps.
 
-★ FREE AND PRO
-Tracking, categories, balances, budgets and this/last month are free forever.
-Pro (free for the first 30 days, then a one-time ₹149, no subscription) adds longer periods and custom dates, all charts, bill reminders, "what was this for?" prompts after each payment, and backup files.
+★ TRY FREE FOR 30 DAYS
+Every feature is free for 30 days. After that, unlock the app with one payment of ₹149 through Google Play. No subscription.
 
 **App category:** Finance
 **Tags:** Budget, Expense tracker, Personal finance
@@ -64,7 +64,7 @@ Pro (free for the first 30 days, then a one-time ₹149, no subscription) adds l
 
 **Ads:** No, the app contains no ads.
 
-**App access:** All functionality is available without special access (no login). For SMS features, reviewers use the video below.
+**App access:** Login required. Choose "All or some functionality is restricted" and explain: "Sign in with any Google account on the first screen (tick the consent box, then Continue with Google). New accounts get a 30-day free trial with every feature unlocked, so no test credentials are needed." For SMS features, reviewers use the video below.
 
 **Content rating:** Category "Utility, productivity, communication or other". Answer No to violence, sexuality, language, controlled substances, gambling, user interaction/sharing, and location sharing. Expected rating: Everyone / 3+.
 
@@ -75,22 +75,32 @@ Pro (free for the first 30 days, then a one-time ₹149, no subscription) adds l
 **Financial features:** choose "Budgeting / money management / personal finance tracking" (no loans, no investments sold, no payments made through the app). Not a lender, not a payment app.
 
 **Data safety**
-• Does your app collect or share any of the required user data types? **No.**
-  The app has no internet permission, no SDKs that send data, no analytics. SMS and money data are processed only on the device and never leave it ("processed only on device" is not "collected" under Play's definition).
-• The Pro purchase is handled by Google Play itself. The app sends nothing to the developer.
-• Is all user data encrypted in transit? Not applicable (no data is sent).
-• Can users request deletion? Uninstall or clear storage removes everything.
+• Does your app collect or share any of the required user data types? **Yes, collects. Shares: No.**
+• Is all of the user data collected by your app encrypted in transit? **Yes.**
+• Do you provide a way for users to request that their data is deleted? **Yes**, delete-account URL: https://infinityinketan-sketch.github.io/Wealth-manager-/delete-account.html
+
+Data types to tick (for each: Collected = Yes, Shared = No, Processed ephemerally = No):
+| Data type | Required or optional | Purposes |
+|---|---|---|
+| Personal info → **Name** | Required | Account management, App functionality |
+| Personal info → **Email address** | Required | Account management, App functionality, Developer communications |
+| App activity → **App interactions** | Optional (user can turn off) | Analytics |
+| App info and performance → **Diagnostics** (app/Android version, phone model) | Required | App functionality, Analytics |
+| Personal info → **User IDs** | Required | Account management (the Firebase account ID) |
+
+Do **not** tick: Financial info, Messages (SMS is processed only on the device and never transmitted), Location, Contacts, Photos, Audio, Files, Calendar, Health, Web browsing.
+Purchase history: leave unticked; the purchase is handled by Google Play itself and the app only stores a yes/no "Pro" flag. (If you prefer to be extra careful, tick Financial info → Purchase history, purpose App functionality.)
 
 **SMS and Call Log permissions declaration** (Policy → App content → Sensitive permissions)
 • Core functionality: **SMS-based money management**
   (one of the exceptions Play lists in its SMS permission policy, for apps that track budgets from transaction SMS).
 • Permissions: READ_SMS, RECEIVE_SMS.
 • Description to paste:
-  "Wealth Manager is an offline personal finance tracker. It reads transaction SMS from banks, card issuers, UPI apps and lenders to record spending, income and account balances automatically, and RECEIVE_SMS records new transactions as they arrive. Messages are processed only on the device; the app has no INTERNET permission and no server, so no SMS content is uploaded or shared. Messages that are not from financial senders are ignored."
+  "Wealth Manager is an offline personal finance tracker. It reads transaction SMS from banks, card issuers, UPI apps and lenders to record spending, income and account balances automatically, and RECEIVE_SMS records new transactions as they arrive. Messages are processed only on the device. No SMS content or data derived from it (amounts, balances, merchants) is uploaded or shared; the app's internet use is limited to Google sign-in, an account record (name, email, app version) and Google Play billing. Messages that are not from financial senders are ignored."
 • Video demo link: an unlisted YouTube video, about 1 minute (script below).
 
 ### Video script (record on your phone with the built-in screen recorder)
-1. (0:00) Fresh install. Open the app: the safety pages say "no internet, stays on your phone". Tap Next through them.
+1. (0:00) Fresh install. Open the app: the safety pages say your messages stay on your phone. Tap Next through them, then sign in with Google (show the consent screen).
 2. (0:15) The SMS screen explains why messages are needed. Tap "Allow and scan my messages" and show the Android permission dialog. Allow.
 3. (0:25) Home screen fills with transactions found in bank SMS. Tap one: show the bank message it came from.
 4. (0:40) When a real bank SMS arrives (make a small UPI payment), show the "what was this for?" notification and the entry appearing in the app.
@@ -104,4 +114,4 @@ First release.
 • Charts for any period, per-account balances, budgets
 • Bill dues and reminders
 • Encrypted backup and restore
-• 30 days of Pro free
+• Sign in with Google; every feature free for 30 days, then a one-time unlock
