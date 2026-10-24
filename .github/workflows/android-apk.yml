@@ -38,6 +38,16 @@ jobs:
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --console=plain
 
+      # Same shrinking as the Play build (unsigned here), plus the "no internet" promise check.
+      - name: Check release build
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleRelease --console=plain 2>&1 | tee -a build.log
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2
+          "$AAPT2" dump permissions $(ls app/build/outputs/apk/release/*.apk | head -1) | tee perms.txt
+          while IFS= read -r line; do echo "::notice::$line"; done < perms.txt
+          if grep -q "android.permission.INTERNET" perms.txt; then echo "::error::INTERNET permission found"; exit 1; fi
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
