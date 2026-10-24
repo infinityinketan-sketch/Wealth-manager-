@@ -18,6 +18,8 @@ class LedgerApp : Application() {
         private set
     lateinit var database: LedgerDatabase
         private set
+    lateinit var pro: com.example.ledger.billing.ProStore
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -30,6 +32,7 @@ class LedgerApp : Application() {
         database = LedgerDatabase.build(this)
         repository = LedgerRepository(database)
         settings = Settings(this)
+        pro = com.example.ledger.billing.ProStore(this, settings)
 
         // Once a day, turn any recurring entries that have come due into real entries.
         val request = PeriodicWorkRequestBuilder<RecurringWorker>(1, TimeUnit.DAYS).build()

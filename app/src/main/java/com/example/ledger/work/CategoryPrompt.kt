@@ -32,7 +32,7 @@ object CategoryPrompt {
     private fun notificationId(txId: Long) = 100_000 + (txId % 1_000_000).toInt()
 
     suspend fun maybeAsk(context: Context, repo: LedgerRepository, settings: Settings, t: LedgerTransaction) {
-        if (!settings.askCategory) return
+        if (!settings.askCategory || !settings.isPro) return
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return

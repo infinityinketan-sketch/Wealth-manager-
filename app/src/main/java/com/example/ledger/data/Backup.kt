@@ -119,11 +119,21 @@ object Backup {
         }
         db.invalidationTracker.refreshVersionsAsync()
 
-        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        val current = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val editor = current.edit()
         root.optJSONArray("settings")?.let { list ->
             for (i in 0 until list.length()) {
                 val e = list.getJSONObject(i)
                 val k = e.getString("k")
+                // Pro comes only from Google Play, never from a file.
+                if (k == "pro_purchased" || k == "trial_end_seen") continue
+                // Keep the earlier first-use date so the trial is not restarted by a restore.
+                if (k == "first_use") {
+                    val mine = current.getLong(k, 0L)
+                    val theirs = e.getLong("v")
+                    editor.putLong(k, if (mine == 0L) theirs else minOf(mine, theirs))
+                    continue
+                }
                 when (e.getString("t")) {
                     "b" -> editor.putBoolean(k, e.getBoolean("v"))
                     "i" -> editor.putInt(k, e.getInt("v"))

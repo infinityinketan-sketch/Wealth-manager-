@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -28,7 +29,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 @Composable
-fun BackupCard(lastBackupMillis: Long, onBackup: () -> Unit, onRestore: () -> Unit) {
+fun BackupCard(lastBackupMillis: Long, onBackup: () -> Unit, onRestore: () -> Unit, locked: Boolean = false) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Backup & restore", fontWeight = FontWeight.SemiBold)
@@ -45,7 +46,10 @@ fun BackupCard(lastBackupMillis: Long, onBackup: () -> Unit, onRestore: () -> Un
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onBackup) { Text("Back up now") }
+                Button(onClick = onBackup) {
+                    if (locked) { ProLock(); androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp)) }
+                    Text("Back up now")
+                }
                 OutlinedButton(onClick = onRestore) { Text("Restore") }
             }
         }

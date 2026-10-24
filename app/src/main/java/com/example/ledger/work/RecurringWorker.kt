@@ -12,7 +12,7 @@ class RecurringWorker(context: Context, params: WorkerParameters) : CoroutineWor
         return try {
             app.repository.generateDueRecurring(LocalDate.now())
             app.repository.checkDuesPaid()
-            DueNotifier.notifySoon(applicationContext, app.repository.openDues())
+            if (app.settings.isPro) DueNotifier.notifySoon(applicationContext, app.repository.openDues())
             Result.success()
         } catch (e: Exception) {
             Result.retry()

@@ -164,6 +164,8 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         pickingFile = false
+        // Check the Pro purchase with Google Play (works offline from the saved answer).
+        (application as LedgerApp).pro.refresh()
         smsGranted = hasSmsPermission()
         // Pick up anything that arrived while the app was closed.
         if (smsGranted && !locked) viewModel.scanSms()
@@ -338,6 +340,30 @@ private fun LedgerRoot(
     val recurring by viewModel.recurring.collectAsStateWithLifecycle()
     val startDay by viewModel.startDay.collectAsStateWithLifecycle()
 
+    // ---- Pro ----
+    val app = context.applicationContext as LedgerApp
+    val pro by app.pro.state.collectAsStateWithLifecycle()
+    // (reason, trial just ended) when the Pro sheet is open.
+    var proAsk by remember { mutableStateOf<Pair<String?, Boolean>?>(null) }
+    androidx.compose.runtime.LaunchedEffect(pro.isPro) {
+        if (!pro.isPro) {
+            // Trial over: move back to a free period, and say so politely once.
+            if (periodChoice.preset !in com.example.ledger.ui.FREE_PRESETS) {
+                viewModel.choosePreset(com.example.ledger.core.PeriodPreset.THIS_MONTH)
+            }
+            if (!app.settings.trialEndSeen && !pro.purchased) {
+                app.settings.trialEndSeen = true
+                proAsk = null to true
+            }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(pro.message) {
+        pro.message?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            app.pro.clearMessage()
+        }
+    }
+
     var tab by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<LedgerTransaction?>(null) }
@@ -409,6 +435,8 @@ private fun LedgerRoot(
                 onPrevious = viewModel::previousPeriod,
                 onNext = viewModel::nextPeriod,
                 onOpenCategory = { id, kind, accountId -> openCategory = Triple(id, kind, accountId) },
+                pro = pro,
+                onNeedPro = { reason -> proAsk = reason to false },
                 onEdit = {
                     editing = it
                     showEditor = true
@@ -441,6 +469,9 @@ private fun LedgerRoot(
                     openBackup.launch(arrayOf("*/*"))
                 },
                 onShowSafety = onShowSafety,
+                pro = pro,
+                onNeedPro = { reason -> proAsk = reason to false },
+                onRestorePurchase = { app.pro.restore() },
                 onProblemReport = {
                     problem = com.example.ledger.data.CrashLog.read(context)
                     showProblem = true
@@ -522,6 +553,23 @@ private fun LedgerRoot(
                 viewModel.restore(uri, pw)
             },
             onDismiss = { restoreUri = null }
+        )
+    }
+
+    proAsk?.let { (reason, ended) ->
+        com.example.ledger.ui.ProDialog(
+            p = pro,
+            reason = reason,
+            trialJustEnded = ended,
+            onBuy = {
+                val activity = context as? android.app.Activity
+                if (activity == null || !app.pro.buy(activity)) {
+                    Toast.makeText(context, "Google Play is not reachable right now. Try again when online.", Toast.LENGTH_LONG).show()
+                }
+                proAsk = null
+            },
+            onRestore = { app.pro.restore() },
+            onDismiss = { proAsk = null }
         )
     }
 

@@ -84,8 +84,12 @@ fun MoreScreen(
     lastBackupMillis: Long = 0L,
     onBackup: () -> Unit = {},
     onRestore: () -> Unit = {},
+    pro: com.example.ledger.billing.ProState? = null,
+    onNeedPro: (String?) -> Unit = {},
+    onRestorePurchase: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val isPro = pro?.isPro ?: true
     var dialog by remember { mutableStateOf<MoreDialog?>(null) }
     val budgetByCategory = remember(budgets) { budgets.associateBy { it.categoryId } }
     val categoryById = remember(categories) { categories.associateBy { it.id } }
@@ -97,7 +101,9 @@ fun MoreScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { BackupCard(lastBackupMillis, onBackup, onRestore) }
+        if (pro != null) item { ProCard(pro, onOpen = { onNeedPro(null) }, onRestore = onRestorePurchase) }
+        // Restoring a backup is always free; making new backup files is Pro.
+        item { BackupCard(lastBackupMillis, if (isPro) onBackup else { { onNeedPro("Making a backup file") } }, onRestore, locked = !isPro) }
 
         // ---- Settings ----
         item { SectionTitle("Settings") }
@@ -137,7 +143,10 @@ fun MoreScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Ask what each payment was for")
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("Ask what each payment was for")
+                                if (!isPro) ProLock()
+                            }
                             Text(
                                 "A notification after each new payment or credit, with one-tap categories. " +
                                     "Shops you already chose for are not asked again.",
@@ -145,7 +154,10 @@ fun MoreScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(checked = askCategory, onCheckedChange = onAskCategoryChange)
+                        Switch(
+                            checked = askCategory && isPro,
+                            onCheckedChange = { on -> if (isPro) onAskCategoryChange(on) else onNeedPro("\"What was this for?\" notifications") }
+                        )
                     }
                 }
             }

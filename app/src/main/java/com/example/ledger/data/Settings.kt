@@ -69,7 +69,28 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_ONBOARDING, false)
         set(value) = prefs.edit().putBoolean(KEY_ONBOARDING, value).apply()
 
+    /** Cached answer from Google Play: true once Pro was bought on this Google account. */
+    var proPurchased: Boolean
+        get() = prefs.getBoolean(KEY_PRO, false)
+        set(value) = prefs.edit().putBoolean(KEY_PRO, value).apply()
+
+    /** When the app was first opened; the 30-day Pro trial counts from here. */
+    var firstUseMillis: Long
+        get() = prefs.getLong(KEY_FIRST_USE, 0L)
+        set(value) = prefs.edit().putLong(KEY_FIRST_USE, value).apply()
+
+    /** True once the "trial has ended" note was shown. */
+    var trialEndSeen: Boolean
+        get() = prefs.getBoolean(KEY_TRIAL_END_SEEN, false)
+        set(value) = prefs.edit().putBoolean(KEY_TRIAL_END_SEEN, value).apply()
+
+    val isPro: Boolean
+        get() = com.example.ledger.core.Trial.isPro(proPurchased, firstUseMillis, System.currentTimeMillis())
+
     private companion object {
+        const val KEY_PRO = "pro_purchased"
+        const val KEY_FIRST_USE = "first_use"
+        const val KEY_TRIAL_END_SEEN = "trial_end_seen"
         const val KEY_ONBOARDING = "onboarding_seen"
         const val KEY_LAST_BACKUP = "last_backup"
         const val KEY_ASK_CATEGORY = "ask_category"

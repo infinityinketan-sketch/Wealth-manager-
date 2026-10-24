@@ -78,6 +78,9 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 
+/** Periods that stay free after the trial. */
+val FREE_PRESETS = setOf(PeriodPreset.THIS_MONTH, PeriodPreset.LAST_MONTH)
+
 private enum class ChartKind(val label: String) { CATEGORIES("Categories"), OVER_TIME("Over time"), TREND("Trend"), MERCHANTS("Top merchants") }
 
 @Composable
@@ -117,12 +120,16 @@ fun HomeScreen(
     onNext: () -> Unit,
     onEdit: (LedgerTransaction) -> Unit,
     onOpenCategory: (categoryId: Long?, kind: EntryKind, accountId: Long?) -> Unit,
+    pro: com.example.ledger.billing.ProState,
+    onNeedPro: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Tapping an account shows only that account's money; tapping it again shows everything.
     var selectedAccountId by rememberSaveable { mutableStateOf<Long?>(null) }
     var chart by rememberSaveable { mutableStateOf(ChartKind.CATEGORIES) }
     var showRangePicker by remember { mutableStateOf(false) }
+    // Pro ran out while a Pro chart was showing: fall back to the free one.
+    if (!pro.isPro && chart != ChartKind.CATEGORIES) chart = ChartKind.CATEGORIES
 
     val accountById = remember(accounts) { accounts.associateBy { it.id } }
     val categoryById = remember(categories) { categories.associateBy { it.id } }
@@ -213,11 +220,20 @@ fun HomeScreen(
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(PeriodPreset.values().toList()) { p ->
+                    val locked = !pro.isPro && p !in FREE_PRESETS
                     FilterChip(
                         selected = preset == p,
-                        onClick = { if (p == PeriodPreset.CUSTOM) showRangePicker = true else onPreset(p) },
+                        onClick = {
+                            when {
+                                locked -> onNeedPro("Choosing \"" + p.label + "\"")
+                                p == PeriodPreset.CUSTOM -> showRangePicker = true
+                                else -> onPreset(p)
+                            }
+                        },
                         label = { Text(p.label) },
-                        leadingIcon = if (p == PeriodPreset.CUSTOM) {
+                        leadingIcon = if (locked) {
+                            { ProLock() }
+                        } else if (p == PeriodPreset.CUSTOM) {
                             { Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(18.dp)) }
                         } else null,
                         colors = FilterChipDefaults.filterChipColors(
@@ -228,6 +244,10 @@ fun HomeScreen(
                     )
                 }
             }
+        }
+
+        if (pro.showCountdown) {
+            item { TrialCountdown(pro, onOpen = { onNeedPro(null) }) }
         }
 
         selectedAccountId?.let { id ->
@@ -424,7 +444,20 @@ fun HomeScreen(
 
         // ---- dues & reminders ----
         if (selectedAccountId == null) {
-            item {
+            if (!pro.isPro) item {
+                SoftCard {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ProLock()
+                        Text("Dues & reminders", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onNeedPro("Bill dues and reminders") }) { Text("Unlock") }
+                    }
+                    Text(
+                        "Card bills, EMIs and subscriptions found in your messages, with a nudge before each due date.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else item {
                 DuesSection(
                     dues = dues,
                     suggestions = suggestions,
@@ -443,10 +476,12 @@ fun HomeScreen(
                 Text("Where your money went", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(ChartKind.values().toList()) { k ->
+                        val locked = !pro.isPro && k != ChartKind.CATEGORIES
                         FilterChip(
                             selected = chart == k,
-                            onClick = { chart = k },
+                            onClick = { if (locked) onNeedPro("The \"" + k.label + "\" chart") else chart = k },
                             label = { Text(k.label) },
+                            leadingIcon = if (locked) { { ProLock() } } else null,
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
