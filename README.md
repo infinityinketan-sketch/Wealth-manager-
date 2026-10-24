@@ -178,4 +178,4 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - After the trial: Monthly or Yearly subscription (auto-renewing), 1-month or 1-year pass (Play prepaid plans, no renewal), or Lifetime. Prices come from Play Console.
 - Products: one-time `wealth_manager_pro` (lifetime); subscription `wealth_manager_premium` with base plans `monthly`, `yearly`, `month-pass`, `year-pass`.
 - Active subscriptions are re-checked with Play on every open and trusted offline for 7 days. "Manage or cancel in Google Play" link for subscribers.
-
+- Send feedback (More → Send feedback, or "Send to developer" on a crash report): type, optional stars, message, optional reply email and crash details, saved in Firestore `feedback`. Long numbers and UPI ids are redacted on the phone first; feedback is deleted with the account.

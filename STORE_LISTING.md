@@ -89,6 +89,8 @@ Data types to tick (for each: Collected = Yes, Shared = No, Processed ephemerall
 | Personal info → **Email address** | Required | Account management, App functionality, Developer communications |
 | App activity → **App interactions** | Optional (user can turn off) | Analytics |
 | App info and performance → **Diagnostics** (app/Android version, phone model) | Required | App functionality, Analytics |
+| App activity → **Other user-generated content** (feedback messages) | Optional | App functionality, Developer communications |
+| App info and performance → **Crash logs** (only when the user attaches them to feedback) | Optional | Analytics, App functionality |
 | Personal info → **User IDs** | Required | Account management (the Firebase account ID) |
 
 Do **not** tick: Financial info, Messages (SMS is processed only on the device and never transmitted), Location, Contacts, Photos, Audio, Files, Calendar, Health, Web browsing.

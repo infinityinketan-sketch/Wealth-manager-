@@ -108,3 +108,12 @@ In the old app: More → Back up now. In the Play app: More → Restore. Then un
 ## Looking at your users
 Firebase console → Firestore Database → `users`: one document per person with name, email, createdAt, lastOpenAt, appVersion, androidVersion, deviceModel, pro, plan, and (only if they agreed) `usage` counts such as app_open, sort_screen, category_open, backup.
 Use this data only for the purposes in the privacy policy (running accounts, support, improving the app). Emailing people marketing needs separate consent.
+
+## Reading feedback
+Firebase console → Firestore Database → `feedback`. Each message has: `type` (problem, category, idea, praise, other), `rating` (1–5, optional), `message`, `replyTo` (email, only if the person asked for a reply), `crash` (only if attached), `appVersion`, `androidVersion`, `deviceModel`, `plan`, `createdAt`, `status`.
+* Sort by `createdAt` to see the newest. Change `status` to `done` once handled (you can edit it in the console).
+* Reply from your support email to `replyTo`. Don't email people who didn't tick the reply box.
+* Free tip: Firebase console → Extensions → "Trigger Email" can email you each new feedback, but it needs the paid Blaze plan; checking the console is free.
+* Delete feedback older than 2 years (the privacy policy promises this).
+* Rules: if you pasted `firestore.rules` before, paste them again; the `feedback` section is new.
+
