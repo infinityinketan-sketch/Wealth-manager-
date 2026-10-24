@@ -46,6 +46,7 @@ class ProStore(context: Context, private val settings: Settings) : PurchasesUpda
         .build()
 
     private var details: ProductDetails? = null
+    @Volatile private var connecting = false
     private val _state = MutableStateFlow(snapshot())
     val state: StateFlow<ProState> = _state.asStateFlow()
 
@@ -67,15 +68,22 @@ class ProStore(context: Context, private val settings: Settings) : PurchasesUpda
     fun refresh() {
         update { it }
         if (client.isReady) { queryAll(); return }
+        if (connecting) return
+        connecting = true
         try {
             client.startConnection(object : BillingClientStateListener {
                 override fun onBillingSetupFinished(result: BillingResult) {
+                    connecting = false
                     if (result.responseCode == BillingClient.BillingResponseCode.OK) queryAll()
                     else update { it.copy(storeReady = false) }
                 }
-                override fun onBillingServiceDisconnected() { update { it.copy(storeReady = false) } }
+                override fun onBillingServiceDisconnected() {
+                    connecting = false
+                    update { it.copy(storeReady = false) }
+                }
             })
         } catch (e: Exception) {
+            connecting = false
             update { it.copy(storeReady = false) }
         }
     }
