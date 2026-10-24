@@ -46,7 +46,10 @@ Wealth Manager tracks your money automatically from the SMS your bank already se
 Some payments send no SMS (small UPI payments on some banks, cash, wallets). You can add those yourself in two taps.
 
 ★ TRY FREE FOR 30 DAYS
-Every feature is free for 30 days. After that, unlock the app with one payment of ₹149 through Google Play. No subscription.
+Every feature is free for 30 days. Then choose what suits you, all through Google Play:
+• Monthly or yearly subscription (cancel any time)
+• 1-month or 1-year pass, paid once, never auto-renews
+• Lifetime: pay once, keep it forever
 
 **App category:** Finance
 **Tags:** Budget, Expense tracker, Personal finance
@@ -114,4 +117,4 @@ First release.
 • Charts for any period, per-account balances, budgets
 • Bill dues and reminders
 • Encrypted backup and restore
-• Sign in with Google; every feature free for 30 days, then a one-time unlock
+• Sign in with Google; every feature free for 30 days, then monthly, yearly, pass or lifetime plans

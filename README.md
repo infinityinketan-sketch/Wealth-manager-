@@ -174,3 +174,8 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
 - In-app and web account deletion (`docs/delete-account.html`). Firestore security rules in `firestore.rules`.
 - Fixed debug signing key (`app/debug.keystore`) so Google sign-in works in CI test builds.
 
+## v1.1.0 (cont.): plans
+- After the trial: Monthly or Yearly subscription (auto-renewing), 1-month or 1-year pass (Play prepaid plans, no renewal), or Lifetime. Prices come from Play Console.
+- Products: one-time `wealth_manager_pro` (lifetime); subscription `wealth_manager_premium` with base plans `monthly`, `yearly`, `month-pass`, `year-pass`.
+- Active subscriptions are re-checked with Play on every open and trusted offline for 7 days. "Manage or cancel in Google Play" link for subscribers.
+
