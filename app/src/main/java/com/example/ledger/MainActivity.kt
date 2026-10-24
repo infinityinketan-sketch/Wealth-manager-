@@ -121,9 +121,6 @@ class MainActivity : FragmentActivity() {
         setContent {
             val account by app.account.state.collectAsStateWithLifecycle()
             val pro by app.pro.state.collectAsStateWithLifecycle()
-    val accountState by app.account.state.collectAsStateWithLifecycle()
-    var usageConsent by remember { mutableStateOf(app.settings.usageConsent) }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
             val scope = androidx.compose.runtime.rememberCoroutineScope()
             LedgerTheme {
                 if (locked) {
@@ -385,6 +382,9 @@ private fun LedgerRoot(
     // ---- Pro ----
     val app = context.applicationContext as LedgerApp
     val pro by app.pro.state.collectAsStateWithLifecycle()
+    val accountState by app.account.state.collectAsStateWithLifecycle()
+    var usageConsent by remember { mutableStateOf(app.settings.usageConsent) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     // (reason, trial just ended) when the Pro sheet is open.
     var proAsk by remember { mutableStateOf<Pair<String?, Boolean>?>(null) }
     androidx.compose.runtime.LaunchedEffect(pro.isPro) {
