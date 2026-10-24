@@ -126,7 +126,7 @@ object Backup {
                 val e = list.getJSONObject(i)
                 val k = e.getString("k")
                 // Pro comes only from Google Play, never from a file.
-                if (k == "pro_purchased" || k == "trial_end_seen" || k == "trial_start" || k == "usage_consent" || k == "latest_seen") continue
+                if (k.startsWith("sub_") || k == "pro_purchased" || k == "trial_end_seen" || k == "trial_start" || k == "usage_consent" || k == "latest_seen") continue
                 // Keep the earlier first-use date so the trial is not restarted by a restore.
                 if (k == "first_use") {
                     val mine = current.getLong(k, 0L)

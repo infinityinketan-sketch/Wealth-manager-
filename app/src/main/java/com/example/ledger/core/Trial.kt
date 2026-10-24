@@ -15,6 +15,13 @@ object Trial {
     fun isPro(purchased: Boolean, firstUseMillis: Long, nowMillis: Long): Boolean =
         purchased || daysLeft(firstUseMillis, nowMillis) > 0
 
+    /** Days a subscription or pass is trusted offline after Google Play last confirmed it. */
+    const val OFFLINE_GRACE_DAYS = 7
+
+    /** A subscription/pass Play confirmed at [confirmedMillis] still counts at [nowMillis] (phone offline). */
+    fun subscriptionStillValid(active: Boolean, confirmedMillis: Long, nowMillis: Long): Boolean =
+        active && confirmedMillis > 0L && nowMillis - confirmedMillis in 0 until OFFLINE_GRACE_DAYS * DAY
+
     /** Show the "X days of Pro left" note in the last few days of the trial. */
     fun showCountdown(purchased: Boolean, daysLeft: Int): Boolean = !purchased && daysLeft in 1..5
 }

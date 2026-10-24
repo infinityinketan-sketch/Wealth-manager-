@@ -154,7 +154,8 @@ class AccountStore(private val context: Context, private val settings: Settings)
             "appVersion" to BuildConfig.VERSION_NAME,
             "androidVersion" to Build.VERSION.RELEASE,
             "deviceModel" to (Build.MANUFACTURER + " " + Build.MODEL),
-            "pro" to settings.proPurchased,
+            "pro" to settings.hasPaid,
+            "plan" to (if (settings.proPurchased) "lifetime" else if (settings.hasPaid) settings.subPlan ?: "subscription" else null),
             "usageConsent" to settings.usageConsent
         )
     }

@@ -111,11 +111,38 @@ class Settings(context: Context) {
         return maxOf(now, seen)
     }
 
+    /** Google Play last said a subscription or pass is active (cached for offline use). */
+    var subActive: Boolean
+        get() = prefs.getBoolean(KEY_SUB_ACTIVE, false)
+        set(value) = prefs.edit().putBoolean(KEY_SUB_ACTIVE, value).apply()
+
+    var subAutoRenewing: Boolean
+        get() = prefs.getBoolean(KEY_SUB_RENEW, false)
+        set(value) = prefs.edit().putBoolean(KEY_SUB_RENEW, value).apply()
+
+    /** Base plan last bought on this phone (monthly, yearly, month-pass, year-pass), for display. */
+    var subPlan: String?
+        get() = prefs.getString(KEY_SUB_PLAN, null)
+        set(value) = prefs.edit().putString(KEY_SUB_PLAN, value).apply()
+
+    /** When Google Play last confirmed the subscription/pass. */
+    var subConfirmedMillis: Long
+        get() = prefs.getLong(KEY_SUB_CONFIRMED, 0L)
+        set(value) = prefs.edit().putLong(KEY_SUB_CONFIRMED, value).apply()
+
+    /** Lifetime bought, or a subscription/pass active. */
+    val hasPaid: Boolean
+        get() = proPurchased || com.example.ledger.core.Trial.subscriptionStillValid(subActive, subConfirmedMillis, clockNow())
+
     val isPro: Boolean
-        get() = com.example.ledger.core.Trial.isPro(proPurchased, trialFromMillis, clockNow())
+        get() = com.example.ledger.core.Trial.isPro(hasPaid, trialFromMillis, clockNow())
 
     private companion object {
         const val KEY_PRO = "pro_purchased"
+        const val KEY_SUB_ACTIVE = "sub_active"
+        const val KEY_SUB_RENEW = "sub_renewing"
+        const val KEY_SUB_PLAN = "sub_plan"
+        const val KEY_SUB_CONFIRMED = "sub_confirmed"
         const val KEY_TRIAL_START = "trial_start"
         const val KEY_USAGE_CONSENT = "usage_consent"
         const val KEY_LATEST_SEEN = "latest_seen"

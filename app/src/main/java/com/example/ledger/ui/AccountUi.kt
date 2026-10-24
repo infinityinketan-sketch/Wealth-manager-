@@ -123,7 +123,7 @@ fun SignInScreen(state: AccountState, isDebugBuild: Boolean, onSignIn: (usageCon
 fun TrialEndedScreen(
     p: ProState,
     account: AccountState,
-    onBuy: () -> Unit,
+    onBuy: (String) -> Unit,
     onRestore: () -> Unit,
     onSignOut: () -> Unit,
     onDeleteAccount: () -> Unit
@@ -142,28 +142,21 @@ fun TrialEndedScreen(
             ) { Icon(Icons.Filled.WorkspacePremium, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp)) }
             Text("Your free month has ended", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             Text(
-                "Thank you for trying Wealth Manager. To keep using it, unlock it once. Your data is safe on this phone and " +
+                "Thank you for trying Wealth Manager. Choose a plan to keep using it. Your data is safe on this phone and " +
                     "the app keeps noting new bank messages, so nothing is missed when you come back.",
                 style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("One payment, everything included", fontWeight = FontWeight.SemiBold)
+                    Text("Every plan includes everything", fontWeight = FontWeight.SemiBold)
                     (listOf("Automatic tracking from bank, UPI and card SMS", "Per-account balances, budgets and categories") + PRO_FEATURES)
                         .forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-                    Text("No subscription, no ads. Payment by Google Play.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("No ads. Payment by Google Play.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (p.pending) Text("A payment is pending with Google Play. The app unlocks as soon as it is confirmed.", style = MaterialTheme.typography.bodySmall)
-            Button(
-                onClick = onBuy,
-                enabled = p.storeReady && !p.pending,
-                modifier = Modifier.fillMaxWidth().height(52.dp)
-            ) { Text("Unlock for " + (p.price ?: "₹149")) }
-            if (!p.storeReady) {
-                Text("Connecting to Google Play… check your internet connection.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            PlanPicker(p, onBuy)
             OutlinedButton(onClick = onRestore, modifier = Modifier.fillMaxWidth()) { Text("I already paid: restore purchase") }
             Spacer(Modifier.height(8.dp))
             account.email?.let { Text("Signed in as $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

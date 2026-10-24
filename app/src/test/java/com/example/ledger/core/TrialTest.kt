@@ -35,4 +35,12 @@ class TrialTest {
         assertFalse(Trial.showCountdown(false, 0))
         assertFalse(Trial.showCountdown(true, 3))
     }
+
+    @Test fun subscriptionTrustedOfflineForAWeek() {
+        assertTrue(Trial.subscriptionStillValid(true, start, start + 6 * day))
+        assertFalse(Trial.subscriptionStillValid(true, start, start + 7 * day))
+        assertFalse(Trial.subscriptionStillValid(false, start, start + day))
+        assertFalse(Trial.subscriptionStillValid(true, 0L, start))
+        assertFalse(Trial.subscriptionStillValid(true, start, start - day))
+    }
 }

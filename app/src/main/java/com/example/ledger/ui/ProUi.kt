@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,7 +40,84 @@ val PRO_FEATURES = listOf(
     "Encrypted backup files"
 )
 
-private fun priceText(p: ProState) = p.price ?: "₹149"
+private fun priceText(p: ProState) = p.price?.let { "from $it" } ?: "a small payment"
+
+/**
+ * The ways to pay, as tappable cards (yearly is preselected when offered), plus the pay button.
+ * Shows the subscription rules Google Play requires: price, period, renewal and how to cancel.
+ */
+@Composable
+fun PlanPicker(p: ProState, onBuy: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    if (p.purchased) {
+        Text(
+            com.example.ledger.billing.ProStore.planName(p.plan) + " is active." +
+                (if (p.subscriptionActive && !p.autoRenewing && !p.lifetime) " It will not renew; buy again when it ends." else ""),
+            style = MaterialTheme.typography.bodySmall
+        )
+        if (p.subscriptionActive && !p.lifetime) {
+            TextButton(onClick = {
+                try {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(com.example.ledger.billing.ProStore.MANAGE_URL)))
+                } catch (e: Exception) { }
+            }) { Text("Manage or cancel in Google Play") }
+        }
+        return
+    }
+    if (p.plans.isEmpty()) {
+        Text(
+            if (p.storeReady) "Loading prices…" else "Connecting to Google Play… check your internet connection.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+    var chosen by androidx.compose.runtime.saveable.rememberSaveable(p.plans.size) {
+        androidx.compose.runtime.mutableStateOf((p.plans.firstOrNull { it.highlight } ?: p.plans.first()).id)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        p.plans.forEach { plan ->
+            val selected = plan.id == chosen
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                    .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable { chosen = plan.id }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                androidx.compose.material3.RadioButton(selected = selected, onClick = { chosen = plan.id })
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(plan.title, fontWeight = FontWeight.SemiBold)
+                        if (plan.highlight) Text(
+                            "Best value",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.secondary).padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Text(plan.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(plan.price, fontWeight = FontWeight.Bold)
+                    Text(plan.per, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        val plan = p.plans.first { it.id == chosen }
+        Button(
+            onClick = { onBuy(plan.id) },
+            enabled = !p.pending,
+            modifier = Modifier.fillMaxWidth().height(52.dp)
+        ) { Text(if (plan.renews) "Subscribe · ${plan.price} ${plan.per}" else "Pay ${plan.price}") }
+        Text(
+            if (plan.renews) "Charged now, then every " + (if (plan.id == com.example.ledger.billing.ProStore.YEARLY) "year" else "month") +
+                " until you cancel. Cancel any time in Google Play → Payments & subscriptions; you keep access until the end of the paid period."
+            else "One payment through Google Play. Nothing is charged again.",
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 /** Small lock shown on Pro-only chips and buttons once the trial is over. */
 @Composable
@@ -57,7 +135,7 @@ fun TrialCountdown(p: ProState, onOpen: () -> Unit) {
     ) {
         Icon(Icons.Filled.WorkspacePremium, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
         Text(
-            (if (p.trialDaysLeft == 1) "Last day" else "${p.trialDaysLeft} days") + " of free Pro left. Keep it for " + priceText(p) + ", once.",
+            (if (p.trialDaysLeft == 1) "Last day" else "${p.trialDaysLeft} days") + " of your free trial left. Plans " + priceText(p) + ".",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.weight(1f)
@@ -75,7 +153,7 @@ fun ProDialog(
     p: ProState,
     reason: String?,
     trialJustEnded: Boolean,
-    onBuy: () -> Unit,
+    onBuy: (String) -> Unit,
     onRestore: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -85,43 +163,23 @@ fun ProDialog(
         title = {
             Text(
                 when {
-                    p.purchased -> "You have Pro"
-                    trialJustEnded -> "Your free month of Pro has ended"
-                    p.trialDaysLeft > 0 -> "Pro is free for ${p.trialDaysLeft} more days"
-                    else -> "Wealth Manager Pro"
+                    p.purchased -> "You're unlocked"
+                    trialJustEnded -> "Your free month has ended"
+                    p.trialDaysLeft > 0 -> "Free for ${p.trialDaysLeft} more days"
+                    else -> "Unlock Wealth Manager"
                 }
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (reason != null && !p.isPro) Text("$reason is part of Pro.", fontWeight = FontWeight.SemiBold)
-                if (trialJustEnded) {
-                    Text("Thanks for trying it. Tracking your spending stays free, always; only the extras below need Pro.")
-                }
+
                 PRO_FEATURES.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-                if (!p.purchased) {
-                    Text(
-                        "One payment of ${priceText(p)}. No subscription and no ads. " +
-                            "Payment is handled by Google Play.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (!p.storeReady) {
-                        Text(
-                            "Google Play is not reachable right now (or this copy was not installed from Play). " +
-                                "Connect to the internet and open the app again.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    if (p.pending) Text("A payment is pending with Google Play.", style = MaterialTheme.typography.bodySmall)
-                }
+                if (p.pending) Text("A payment is pending with Google Play.", style = MaterialTheme.typography.bodySmall)
+                PlanPicker(p, onBuy)
             }
         },
-        confirmButton = {
-            if (!p.purchased) Button(onClick = onBuy, enabled = p.storeReady && !p.pending) { Text("Get Pro · " + priceText(p)) }
-            else TextButton(onClick = onDismiss) { Text("Close") }
-        },
+        confirmButton = { if (p.purchased) TextButton(onClick = onDismiss) { Text("Close") } },
         dismissButton = {
             if (!p.purchased) Row {
                 TextButton(onClick = onRestore) { Text("Restore") }
@@ -138,21 +196,21 @@ fun ProCard(p: ProState, onOpen: () -> Unit, onRestore: () -> Unit) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Filled.WorkspacePremium, contentDescription = null, tint = Color(0xFFF9A825))
-                Text("Wealth Manager Pro", fontWeight = FontWeight.SemiBold)
+                Text("Your plan", fontWeight = FontWeight.SemiBold)
             }
             Text(
                 when {
-                    p.purchased -> "Unlocked. Thank you for supporting the app!"
-                    p.trialDaysLeft > 0 -> "Free trial: ${p.trialDaysLeft} of ${Trial.DAYS} days left. After that, one payment of ${priceText(p)} keeps Pro."
-                    else -> "Trial ended. Tracking stays free; Pro extras are ${priceText(p)}, once."
+                    p.purchased -> com.example.ledger.billing.ProStore.planName(p.plan) + " active. Thank you for supporting the app!"
+                    p.trialDaysLeft > 0 -> "Free trial: ${p.trialDaysLeft} of ${Trial.DAYS} days left. Then choose monthly, yearly, a 1-month or 1-year pass, or lifetime (${priceText(p)})."
+                    else -> "Trial ended."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (!p.purchased) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onOpen) { Text("See Pro") }
+                Button(onClick = onOpen) { Text("See plans") }
                 OutlinedButton(onClick = onRestore) { Text("Restore purchase") }
-            }
+            } else if (p.subscriptionActive && !p.lifetime) PlanPicker(p) { }
         }
     }
 }

@@ -150,8 +150,8 @@ class MainActivity : FragmentActivity() {
                     com.example.ledger.ui.TrialEndedScreen(
                         p = pro,
                         account = account,
-                        onBuy = {
-                            if (!app.pro.buy(this@MainActivity)) {
+                        onBuy = { plan ->
+                            if (!app.pro.buy(this@MainActivity, plan)) {
                                 Toast.makeText(this@MainActivity, "Google Play is not reachable right now. Try again when online.", Toast.LENGTH_LONG).show()
                             }
                         },
@@ -617,9 +617,9 @@ private fun LedgerRoot(
             p = pro,
             reason = reason,
             trialJustEnded = ended,
-            onBuy = {
+            onBuy = { plan ->
                 val activity = context as? android.app.Activity
-                if (activity == null || !app.pro.buy(activity)) {
+                if (activity == null || !app.pro.buy(activity, plan)) {
                     Toast.makeText(context, "Google Play is not reachable right now. Try again when online.", Toast.LENGTH_LONG).show()
                 }
                 proAsk = null
