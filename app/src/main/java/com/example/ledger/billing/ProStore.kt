@@ -56,7 +56,7 @@ class ProStore(context: Context, private val settings: Settings) : PurchasesUpda
 
     private fun snapshot(): ProState = ProState(
         purchased = settings.proPurchased,
-        trialDaysLeft = Trial.daysLeft(settings.firstUseMillis, System.currentTimeMillis())
+        trialDaysLeft = Trial.daysLeft(settings.trialFromMillis, settings.clockNow())
     )
 
     private fun update(change: (ProState) -> ProState) {

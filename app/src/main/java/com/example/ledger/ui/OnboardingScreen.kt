@@ -60,11 +60,11 @@ private val pages = listOf(
         Icons.Filled.PhoneAndroid,
         listOf(Color(0xFF5B3FE4), Color(0xFF8E7CFF)),
         "Your money stays on your phone",
-        "Wealth Manager works completely offline.",
+        "Your messages, transactions and balances are kept only on this phone.",
         listOf(
-            Icons.Filled.WifiOff to "The app has no internet access at all, so it cannot send your data anywhere.",
-            Icons.Filled.CheckCircle to "No account, no sign-up, no email or phone number needed.",
-            Icons.Filled.CheckCircle to "No ads and no tracking."
+            Icons.Filled.WifiOff to "No SMS, amount, balance or bank detail is ever sent to any server.",
+            Icons.Filled.CheckCircle to "You sign in with Google only for your account and free trial: we keep your name, email and basic app details.",
+            Icons.Filled.CheckCircle to "No ads, and we never sell or share your details."
         )
     ),
     SafetyPage(

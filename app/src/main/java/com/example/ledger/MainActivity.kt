@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import kotlinx.coroutines.launch
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Arrangement
@@ -84,6 +85,8 @@ class MainActivity : FragmentActivity() {
     private var smsGranted by mutableStateOf(false)
     private var smsPromptDone by mutableStateOf(false)
     private var showOnboarding by mutableStateOf(false)
+    /** Test builds without Firebase set up can skip sign-in. */
+    private var skippedSignIn by mutableStateOf(false)
 
     private fun hasSmsPermission() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED &&
@@ -114,7 +117,14 @@ class MainActivity : FragmentActivity() {
         showOnboarding = !settings.onboardingSeen
         handlePromptIntent(intent)
 
+        val app = application as LedgerApp
         setContent {
+            val account by app.account.state.collectAsStateWithLifecycle()
+            val pro by app.pro.state.collectAsStateWithLifecycle()
+    val accountState by app.account.state.collectAsStateWithLifecycle()
+    var usageConsent by remember { mutableStateOf(app.settings.usageConsent) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
             LedgerTheme {
                 if (locked) {
                     LockedScreen(onUnlock = { authenticate() })
@@ -124,6 +134,34 @@ class MainActivity : FragmentActivity() {
                         settings.onboardingSeen = true
                         showOnboarding = false
                     })
+                } else if (!account.signedIn && !skippedSignIn) {
+                    com.example.ledger.ui.SignInScreen(
+                        state = account,
+                        isDebugBuild = BuildConfig.DEBUG,
+                        onSignIn = { consent ->
+                            scope.launch {
+                                if (app.account.signIn(this@MainActivity, consent)) {
+                                    app.pro.refresh()
+                                    app.account.onAppOpen(force = true)
+                                }
+                            }
+                        },
+                        onSkipForTest = { skippedSignIn = true }
+                    )
+                } else if (!pro.isPro) {
+                    // Free month over and not bought: only paying, restoring and account actions.
+                    com.example.ledger.ui.TrialEndedScreen(
+                        p = pro,
+                        account = account,
+                        onBuy = {
+                            if (!app.pro.buy(this@MainActivity)) {
+                                Toast.makeText(this@MainActivity, "Google Play is not reachable right now. Try again when online.", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        onRestore = { app.pro.restore() },
+                        onSignOut = { scope.launch { app.account.signOut() } },
+                        onDeleteAccount = { scope.launch { app.account.deleteAccount(this@MainActivity) } }
+                    )
                 } else if (!smsGranted && !smsPromptDone) {
                     SmsIntroScreen(
                         onAllow = { requestSms() },
@@ -166,6 +204,7 @@ class MainActivity : FragmentActivity() {
         pickingFile = false
         // Check the Pro purchase with Google Play (works offline from the saved answer).
         (application as LedgerApp).pro.refresh()
+        (application as LedgerApp).account.onAppOpen()
         smsGranted = hasSmsPermission()
         // Pick up anything that arrived while the app was closed.
         if (smsGranted && !locked) viewModel.scanSms()
@@ -239,7 +278,7 @@ private fun SmsIntroScreen(onAllow: () -> Unit, onSkip: () -> Unit) {
             Text(
                 "Allow access to your messages and the app finds your bank, UPI and card transactions " +
                     "on its own: what you spent, where, your income and your balances.\n\n" +
-                    "Your messages are read on this phone only. This app has no internet access, so nothing is uploaded, ever. " +
+                    "Your messages are read on this phone only and are never uploaded. " +
                     "Only bank and payment messages are used; personal chats are ignored.",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 20.dp, bottom = 16.dp)
@@ -309,7 +348,10 @@ private fun LedgerRoot(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
         val pw = backupPassword
-        if (uri != null && pw != null) viewModel.backup(uri, pw)
+        if (uri != null && pw != null) {
+            viewModel.getApplication<LedgerApp>().account.track("backup")
+            viewModel.backup(uri, pw)
+        }
         backupPassword = null
     }
     // Restore: the person picks the file, then gives its password.
@@ -429,12 +471,18 @@ private fun LedgerRoot(
                 countChoices = countChoices,
                 toSortCount = toSort.sumOf { it.items.size },
                 toSortTotal = toSort.sumOf { it.total },
-                onSort = { showSort = true },
+                onSort = {
+                    app.account.track("sort_screen")
+                    showSort = true
+                },
                 onPreset = viewModel::choosePreset,
                 onCustom = viewModel::chooseCustom,
                 onPrevious = viewModel::previousPeriod,
                 onNext = viewModel::nextPeriod,
-                onOpenCategory = { id, kind, accountId -> openCategory = Triple(id, kind, accountId) },
+                onOpenCategory = { id, kind, accountId ->
+                    app.account.track("category_open")
+                    openCategory = Triple(id, kind, accountId)
+                },
                 pro = pro,
                 onNeedPro = { reason -> proAsk = reason to false },
                 onEdit = {
@@ -472,6 +520,14 @@ private fun LedgerRoot(
                 pro = pro,
                 onNeedPro = { reason -> proAsk = reason to false },
                 onRestorePurchase = { app.pro.restore() },
+                account = accountState,
+                usageConsent = usageConsent,
+                onUsageConsent = { on ->
+                    usageConsent = on
+                    app.account.setUsageConsent(on)
+                },
+                onSignOut = { scope.launch { app.account.signOut() } },
+                onDeleteAccount = { (context as? android.app.Activity)?.let { a -> scope.launch { app.account.deleteAccount(a) } } },
                 onProblemReport = {
                     problem = com.example.ledger.data.CrashLog.read(context)
                     showProblem = true

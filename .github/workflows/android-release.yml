@@ -33,6 +33,15 @@ jobs:
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           echo "WM_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
 
+      - name: Check Firebase config
+        env:
+          WM_GOOGLE_SERVICES_JSON: ${{ secrets.WM_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ ! -f app/google-services.json ] && [ -z "$WM_GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::app/google-services.json is missing. Download it from Firebase (RELEASE.md, Firebase step)."
+            exit 1
+          fi
+
       - name: Unit tests
         run: |
           chmod +x gradlew
@@ -43,6 +52,7 @@ jobs:
           WM_KEYSTORE_PASSWORD: ${{ secrets.WM_KEYSTORE_PASSWORD }}
           WM_KEY_ALIAS: ${{ secrets.WM_KEY_ALIAS }}
           WM_KEY_PASSWORD: ${{ secrets.WM_KEY_PASSWORD }}
+          WM_GOOGLE_SERVICES_JSON: ${{ secrets.WM_GOOGLE_SERVICES_JSON }}
         run: |
           set -o pipefail
           ./gradlew :app:bundleRelease :app:assembleRelease --console=plain 2>&1 | tee build.log
@@ -54,15 +64,15 @@ jobs:
             [ -n "$line" ] && echo "::error::$line"
           done
 
-      # The app promises "no internet": fail the release if the INTERNET permission ever sneaks in.
+      # The app promises no advertising ID: fail the release if AD_ID ever sneaks in.
       - name: Check permissions
         run: |
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2
           APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           "$AAPT2" dump permissions "$APK" | tee perms.txt
           while IFS= read -r line; do echo "::notice::$line"; done < perms.txt
-          if grep -q "android.permission.INTERNET" perms.txt; then
-            echo "::error::INTERNET permission found in the release build"
+          if grep -q "permission.AD_ID" perms.txt; then
+            echo "::error::Advertising ID permission found in the release build"
             exit 1
           fi
           "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)/apksigner verify --print-certs "$APK" | head -3 | while IFS= read -r line; do echo "::notice::$line"; done

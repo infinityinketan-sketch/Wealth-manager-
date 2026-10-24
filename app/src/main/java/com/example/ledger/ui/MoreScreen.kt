@@ -87,6 +87,11 @@ fun MoreScreen(
     pro: com.example.ledger.billing.ProState? = null,
     onNeedPro: (String?) -> Unit = {},
     onRestorePurchase: () -> Unit = {},
+    account: com.example.ledger.account.AccountState? = null,
+    usageConsent: Boolean = false,
+    onUsageConsent: (Boolean) -> Unit = {},
+    onSignOut: () -> Unit = {},
+    onDeleteAccount: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isPro = pro?.isPro ?: true
@@ -101,6 +106,9 @@ fun MoreScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (account != null && account.signedIn) item {
+            AccountCard(account, usageConsent, onUsageConsent, onSignOut, onDeleteAccount)
+        }
         if (pro != null) item { ProCard(pro, onOpen = { onNeedPro(null) }, onRestore = onRestorePurchase) }
         // Restoring a backup is always free; making new backup files is Pro.
         item { BackupCard(lastBackupMillis, if (isPro) onBackup else { { onNeedPro("Making a backup file") } }, onRestore, locked = !isPro) }

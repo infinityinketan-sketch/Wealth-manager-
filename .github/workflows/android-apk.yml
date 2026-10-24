@@ -46,7 +46,7 @@ jobs:
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2
           "$AAPT2" dump permissions $(ls app/build/outputs/apk/release/*.apk | head -1) | tee perms.txt
           while IFS= read -r line; do echo "::notice::$line"; done < perms.txt
-          if grep -q "android.permission.INTERNET" perms.txt; then echo "::error::INTERNET permission found"; exit 1; fi
+          if grep -q "permission.AD_ID" perms.txt; then echo "::error::Advertising ID permission found"; exit 1; fi
 
       - uses: actions/upload-artifact@v4
         if: always()

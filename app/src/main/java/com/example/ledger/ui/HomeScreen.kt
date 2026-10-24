@@ -396,7 +396,7 @@ fun HomeScreen(
                     Text("Track spending automatically", fontWeight = FontWeight.SemiBold)
                     Text(
                         "Allow SMS access and Wealth Manager finds your bank and UPI transactions by itself. " +
-                            "Messages are read on this phone only; nothing is uploaded.",
+                            "Messages are read on this phone only and never uploaded.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Button(onClick = onEnableSms) { Text("Allow and scan messages") }

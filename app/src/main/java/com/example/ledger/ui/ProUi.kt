@@ -101,7 +101,7 @@ fun ProDialog(
                 PRO_FEATURES.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
                 if (!p.purchased) {
                     Text(
-                        "One payment of ${priceText(p)}. No subscription, no ads, and your data still never leaves your phone. " +
+                        "One payment of ${priceText(p)}. No subscription and no ads. " +
                             "Payment is handled by Google Play.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

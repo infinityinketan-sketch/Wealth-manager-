@@ -3,7 +3,7 @@ package com.example.ledger.data
 import android.content.Context
 import com.example.ledger.core.BudgetPeriod
 
-/** Small on-device preferences. Nothing here ever leaves the phone. */
+/** Small on-device preferences, kept on the phone. */
 class Settings(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("ledger_settings", Context.MODE_PRIVATE)
 
@@ -84,11 +84,41 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_TRIAL_END_SEEN, false)
         set(value) = prefs.edit().putBoolean(KEY_TRIAL_END_SEEN, value).apply()
 
+    /** Trial start for the signed-in Google account, from the server (0 = not known yet). */
+    var trialStartMillis: Long
+        get() = prefs.getLong(KEY_TRIAL_START, 0L)
+        set(value) = prefs.edit().putLong(KEY_TRIAL_START, value).apply()
+
+    /** The person agreed to share feature-use counts. */
+    var usageConsent: Boolean
+        get() = prefs.getBoolean(KEY_USAGE_CONSENT, false)
+        set(value) = prefs.edit().putBoolean(KEY_USAGE_CONSENT, value).apply()
+
+    /** Latest time the app has seen, so turning the phone's clock back does not extend the trial. */
+    var latestSeenMillis: Long
+        get() = prefs.getLong(KEY_LATEST_SEEN, 0L)
+        set(value) = prefs.edit().putLong(KEY_LATEST_SEEN, value).apply()
+
+    /** When the trial counts from: the account's server date when known, else first use on this phone. */
+    val trialFromMillis: Long
+        get() = trialStartMillis.takeIf { it > 0L } ?: firstUseMillis
+
+    /** "Now", never earlier than a time the app has already seen. */
+    fun clockNow(): Long {
+        val now = System.currentTimeMillis()
+        val seen = latestSeenMillis
+        if (now > seen) latestSeenMillis = now
+        return maxOf(now, seen)
+    }
+
     val isPro: Boolean
-        get() = com.example.ledger.core.Trial.isPro(proPurchased, firstUseMillis, System.currentTimeMillis())
+        get() = com.example.ledger.core.Trial.isPro(proPurchased, trialFromMillis, clockNow())
 
     private companion object {
         const val KEY_PRO = "pro_purchased"
+        const val KEY_TRIAL_START = "trial_start"
+        const val KEY_USAGE_CONSENT = "usage_consent"
+        const val KEY_LATEST_SEEN = "latest_seen"
         const val KEY_FIRST_USE = "first_use"
         const val KEY_TRIAL_END_SEEN = "trial_end_seen"
         const val KEY_ONBOARDING = "onboarding_seen"

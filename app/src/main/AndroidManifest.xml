@@ -3,16 +3,17 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-        SMS is read on the phone only, to find bank and UPI transactions. There is no INTERNET
-        permission, so nothing can leave the phone.
+        SMS is read on the phone only, to find bank and UPI transactions; SMS content is never sent.
+        Internet is used only for Google sign-in, the account/trial record and Google Play purchases.
     -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <!-- Bill reminders shown on the phone (Android 13+ asks for this). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
-    <!-- Promise kept even if a library asks for it: the app never gets internet access. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- No advertising ID, even if a library asks for it. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
 
     <application
         android:name=".LedgerApp"
