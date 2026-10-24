@@ -26,13 +26,12 @@ If the run shows a red cross, the error lines are listed on the run page; copy t
 
 Command line: `./gradlew assembleDebug` and `./gradlew test`.
 
-## Before the first Play Store upload
-- Change `applicationId` in `app/build.gradle.kts` (it can never be changed after upload) and the `namespace` / package name if you want them to match.
-- Replace the placeholder launcher icon. The app name shown on the phone is "Wealth Manager" (see `app/src/main/res/values/strings.xml`). Internal code names still say "ledger"; they can be renamed with the package name.
+## Releasing on Google Play
+See [RELEASE.md](RELEASE.md) for the step-by-step checklist and [STORE_LISTING.md](STORE_LISTING.md) for the listing text and policy forms.
+App id `in.wealthmanager.app` (fixed forever once uploaded). Debug builds install alongside as `in.wealthmanager.app.debug`, named "Wealth Manager (test)".
 
 ## Status of this code
-The plain-Kotlin logic in `core/` (money formatting and parsing, budget months, recurrence dates) was compiled and its 23 unit tests were run. The Android parts (database, screens, lock) were written without being compiled, because the build environment could not reach Google's Maven repository. Expect a few compile errors or warnings on the first build; they should be small and quick to fix.
-
+Every push is built in GitHub Actions: debug APK, unit tests, and a shrunk release build that is checked to have no INTERNET permission. The **build-release** workflow makes the signed `.aab` for Play.
 
 ## Stage 2: automatic SMS capture (v0.2.0)
 
@@ -159,3 +158,12 @@ New messages are picked up as they arrive. The app has no INTERNET permission.
   (no internet, no account, no ads), only bank messages are read, the app can never move money (never asks for
   password/PIN/OTP), and the person stays in control (app lock, password backups, uninstall removes all).
 - Skip / Next / Get started; reopen any time from More › "How your data is kept safe".
+
+## v1.0.0: ready for Google Play
+- New app id `in.wealthmanager.app`, targets Android 16 (API 36), edge-to-edge screens.
+- Wealth Manager Pro: 30 days free from first open, then a one-time ₹149 through Google Play. Tracking stays free; Pro adds other periods, extra charts, dues & reminders, "what was this for?" prompts and making backup files. "Restore purchase" in More.
+- New app icon (with Android 13+ themed icon), Play icon and feature graphic in `store/`.
+- Privacy policy page in `docs/` (GitHub Pages).
+- Signed release workflow; release builds are shrunk with R8 and checked for no INTERNET permission.
+- Database upgrades never wipe data from v2 onwards.
+
